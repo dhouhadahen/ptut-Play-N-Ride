@@ -188,13 +188,24 @@
           <h3 class="section-title-small">Dernières Séances & Analyse</h3>
           <div class="history-mini-list">
             <div class="history-mini-item" v-for="(seance, i) in selectedPatient.historique" :key="i">
-              <div class="h-date">{{ seance.date }}</div>
-              <div class="h-info">
-                <strong>{{ seance.scenario }}</strong>
-                <span>{{ seance.duree }} • FC Moy: {{ seance.fcMoy }} bpm • {{ seance.watts }} W</span>
+              <div class="h-header-info">
+                <div class="h-date">{{ seance.date }}</div>
+                <div class="h-info">
+                  <strong>{{ seance.scenario }}</strong>
+                  <span>{{ seance.duree }} • FC Moy: {{ seance.fcMoy }} bpm • {{ seance.watts }} W</span>
+                </div>
+                <div class="h-rpe"><span :class="['diff-badge', 'diff-' + seance.rpe.toLowerCase()]">{{ seance.rpe }}</span></div>
               </div>
-              <div class="h-rpe"><span :class="['diff-badge', 'diff-' + seance.rpe.toLowerCase()]">{{ seance.rpe }}</span></div>
+              
+              <div class="h-chart-effort">
+                <span class="chart-label-mini">Profil d'effort</span>
+                <svg viewBox="0 0 100 30" class="mini-svg-chart">
+                  <line x1="0" y1="25" x2="100" y2="25" stroke="#CBD5E1" stroke-dasharray="2" stroke-width="1"/>
+                  <polyline :points="seance.svgPoints" fill="none" stroke="#00B8D9" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+                </svg>
+              </div>
             </div>
+
             <div v-if="selectedPatient.historique.length === 0" class="text-muted text-xs text-center" style="padding:10px;">
               Aucune séance enregistrée.
             </div>
@@ -558,22 +569,22 @@ const patients = ref([
     id: 1, nom: "Jean Dupont", age: 72, pathologie: "Prothèse Genou Droit", observance: 85, lastRPE: "Difficile", derniereSeance: "Aujourd'hui", avatar: "/images/avBlonde.png",
     metrics: { fcMax: 130, puissanceMoyenne: 45, materiel: "Pédalier (Bras)" },
     historique: [
-      { date: "Aujourd'hui", scenario: "L'Aube Douce", duree: "20 min", fcMoy: 112, watts: 48, rpe: "Difficile" },
-      { date: "Il y a 2 jours", scenario: "L'Échappée Sylvestre", duree: "15 min", fcMoy: 98, watts: 35, rpe: "Moyen" }
+      { date: "Aujourd'hui", scenario: "L'Aube Douce", duree: "20 min", fcMoy: 112, watts: 48, rpe: "Difficile", svgPoints: "0,25 10,20 20,10 30,25 40,20 50,5 60,25 70,25 80,10 90,25 100,20" },
+      { date: "Il y a 2 jours", scenario: "L'Échappée Sylvestre", duree: "15 min", fcMoy: 98, watts: 35, rpe: "Moyen", svgPoints: "0,20 10,15 20,20 30,10 40,5 50,20 60,25 70,20 80,15 90,10 100,20" }
     ]
   },
   { 
     id: 2, nom: "Marie Martin", age: 68, pathologie: "Rééducation Cardiaque", observance: 95, lastRPE: "Facile", derniereSeance: "Hier", avatar: "/images/avatarRousse.png",
     metrics: { fcMax: 120, puissanceMoyenne: 30, materiel: "Vélo Complet" },
     historique: [
-      { date: "Hier", scenario: "Souffle Océanique", duree: "10 min", fcMoy: 95, watts: 25, rpe: "Facile" }
+      { date: "Hier", scenario: "Souffle Océanique", duree: "10 min", fcMoy: 95, watts: 25, rpe: "Facile", svgPoints: "0,25 20,25 40,10 60,25 80,25 100,25" }
     ]
   },
   { 
     id: 3, nom: "Pierre Durand", age: 80, pathologie: "Post-AVC", observance: 40, lastRPE: "Moyen", derniereSeance: "Il y a 7 jours", avatar: "/images/avBlackW.png",
     metrics: { fcMax: 115, puissanceMoyenne: 20, materiel: "Pédalier (Jambes)" },
     historique: [
-      { date: "12 Oct.", scenario: "Le Jardin des Sens", duree: "12 min", fcMoy: 88, watts: 18, rpe: "Moyen" }
+      { date: "12 Oct.", scenario: "Le Jardin des Sens", duree: "12 min", fcMoy: 88, watts: 18, rpe: "Moyen", svgPoints: "0,25 15,20 30,15 45,25 60,10 75,20 90,25 100,20" }
     ]
   },
   { 
@@ -900,13 +911,18 @@ onMounted(() => {
 .health-list li:last-child { border-bottom: none; margin-bottom: 0; padding-bottom: 0;}
 .observance-big { font-size: 2.2rem; font-weight: 900; color: #20C997; text-align: center; line-height: 1; margin-bottom: 5px;}
 .section-title-small { font-size: 0.95rem; color: #0A192F; font-weight: 800; margin-bottom: 15px; border-bottom: 2px solid #F1F5F9; padding-bottom: 8px;}
-.history-mini-list { display: flex; flex-direction: column; gap: 10px;}
-.history-mini-item { display: flex; align-items: center; justify-content: space-between; background: #F8FAFC; padding: 10px 12px; border-radius: 8px; border: 1px solid #E2E8F0;}
-.h-date { font-size: 0.75rem; font-weight: 800; color: #6B7C93; width: 70px;}
-.h-info { flex: 1; display: flex; flex-direction: column;}
-.h-info strong { font-size: 0.85rem; color: #0A192F;}
-.h-info span { font-size: 0.7rem; color: #94A3B8;}
-.h-rpe { margin-left: 5px; }
+
+/* NOUVEAUX STYLES POUR LA COURBE SVG DANS LE DOSSIER KINE */
+.history-mini-list { display: flex; flex-direction: column; gap: 15px;}
+.history-mini-item { display: flex; flex-direction: column; gap: 10px; background: white; padding: 15px; border-radius: 12px; border: 1px solid #E2E8F0; box-shadow: 0 2px 5px rgba(0,0,0,0.02);}
+.h-header-info { display: flex; align-items: flex-start; justify-content: space-between; }
+.h-date { font-size: 0.75rem; font-weight: 800; color: #6B7C93; width: 60px;}
+.h-info { flex: 1; display: flex; flex-direction: column; padding-right: 10px;}
+.h-info strong { font-size: 0.9rem; color: #0A192F; margin-bottom: 2px;}
+.h-info span { font-size: 0.75rem; color: #94A3B8;}
+.h-chart-effort { background: #FAFCFF; border-radius: 8px; padding: 10px; border: 1px solid #F1F5F9; }
+.chart-label-mini { font-size: 0.7rem; font-weight: 800; color: #0A192F; text-transform: uppercase; margin-bottom: 5px; display: block;}
+.mini-svg-chart { width: 100%; height: 30px; display: block;}
 
 /* ONGLET 2 : AGENDA CALENDRIER */
 .calendar-controls { display: flex; align-items: center; gap: 15px;}

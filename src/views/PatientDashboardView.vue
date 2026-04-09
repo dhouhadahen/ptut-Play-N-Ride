@@ -311,7 +311,7 @@
                           <span class="detail-value text-red">{{ session.avgBpm }} BPM</span>
                         </div>
                         <div class="detail-item">
-                          <span class="detail-label">Ressenti patient</span>
+                          <span class="detail-label">Votre Ressenti</span>
                           <div class="detail-value-stars">
                             <span v-for="star in 5" :key="star" class="star-icon" :class="{ filled: star <= session.rating }">
                               <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" stroke="none"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>
@@ -320,6 +320,15 @@
                           </div>
                         </div>
                       </div>
+                      
+                      <div class="h-chart-effort" style="margin-top: 20px;">
+                        <span class="chart-label-mini">Votre profil d'effort (Cadence/Esquive)</span>
+                        <svg viewBox="0 0 100 30" class="mini-svg-chart" style="height: 60px;">
+                          <line x1="0" y1="25" x2="100" y2="25" stroke="#CBD5E1" stroke-dasharray="2" stroke-width="1"/>
+                          <polyline :points="session.svgPoints" fill="none" stroke="#00B8D9" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+                        </svg>
+                      </div>
+
                     </div>
                   </td>
                 </tr>
@@ -514,13 +523,12 @@ const generateWeekSchedule = () => {
 }
 
 const historyData = ref([
-  { date: "Hier", type: "prescrit", scenario: "L'Aube Douce", duration: "15 min", score: 450, reviewed: true, avgSpeed: "18.5", avgBpm: 112, rating: 4, difficulty: "Facile" },
-  { date: "12 Oct", type: "prescrit", scenario: "Souffle Océanique", duration: "10 min", score: 380, reviewed: true, avgSpeed: "16.2", avgBpm: 105, rating: 5, difficulty: "Facile" },
-  { date: "10 Oct", type: "libre", scenario: "L'Échappée Sylvestre", duration: "20 min", score: 510, reviewed: false, avgSpeed: "21.0", avgBpm: 125, rating: 3, difficulty: "Moyen" },
-  { date: "05 Oct", type: "prescrit", scenario: "Le Jardin des Sens", duration: "12 min", score: 230, reviewed: true, avgSpeed: "15.0", avgBpm: 100, rating: 4, difficulty: "Facile" }
+  { date: "Hier", type: "prescrit", scenario: "L'Aube Douce", duration: "15 min", score: 450, reviewed: true, avgSpeed: "18.5", avgBpm: 112, rating: 4, difficulty: "Facile", svgPoints: "0,25 10,20 20,10 30,25 40,20 50,5 60,25 70,25 80,10 90,25 100,20" },
+  { date: "12 Oct", type: "prescrit", scenario: "Souffle Océanique", duration: "10 min", score: 380, reviewed: true, avgSpeed: "16.2", avgBpm: 105, rating: 5, difficulty: "Facile", svgPoints: "0,25 20,25 40,10 60,25 80,25 100,25" },
+  { date: "10 Oct", type: "libre", scenario: "L'Échappée Sylvestre", duration: "20 min", score: 510, reviewed: false, avgSpeed: "21.0", avgBpm: 125, rating: 3, difficulty: "Moyen", svgPoints: "0,20 10,15 20,20 30,10 40,5 50,20 60,25 70,20 80,15 90,10 100,20" },
+  { date: "05 Oct", type: "prescrit", scenario: "Le Jardin des Sens", duration: "12 min", score: 230, reviewed: true, avgSpeed: "15.0", avgBpm: 100, rating: 4, difficulty: "Facile", svgPoints: "0,25 15,20 30,15 45,25 60,10 75,20 90,25 100,20" }
 ])
 
-// --- LOGIQUE POUR LES NOUVEAUX GRAPHIQUES ---
 const totalTimePlayed = computed(() => historyData.value.reduce((acc, curr) => acc + parseInt(curr.duration), 0))
 const averageScore = computed(() => {
   if (historyData.value.length === 0) return 0;
@@ -528,18 +536,15 @@ const averageScore = computed(() => {
   return Math.round(sum / historyData.value.length);
 });
 
-// On inverse pour que le graphique aille de gauche à droite (du plus ancien au plus récent)
 const reversedHistory = computed(() => [...historyData.value].reverse().slice(0, 5)); 
 
 const prescritCount = computed(() => historyData.value.filter(s => s.type === 'prescrit').length)
 const libreCount = computed(() => historyData.value.filter(s => s.type === 'libre').length)
 
-// Calcul pour générer les Barres du graphique des Scores
 const scoreBarPoints = computed(() => {
   const data = reversedHistory.value;
   if (data.length === 0) return [];
   
-  // Correction des dimensions pour éviter le débordement visuel
   const width = 480; 
   const height = 150; 
   const maxScore = 600;
@@ -558,7 +563,6 @@ const scoreBarPoints = computed(() => {
   });
 });
 
-// Calcul des pourcentages pour le Donut SVG
 const percentPrescrit = computed(() => {
   if (historyData.value.length === 0) return 0;
   return Math.round((prescritCount.value / historyData.value.length) * 100);
@@ -694,7 +698,7 @@ const startGame = () => {
 .stat-info p { color: #6B7C93; font-size: 0.95rem; margin-bottom: 5px; font-weight: 700; text-transform: uppercase;}
 .stat-info h3 { color: #0A192F; font-size: 1.8rem; font-weight: 900; margin: 0;}
 
-/* VRAIS GRAPHIQUES SVG AVEC AXES (CORRIGÉ POUR RENTRER DANS LE CADRE) */
+/* VRAIS GRAPHIQUES SVG AVEC AXES */
 .charts-dashboard { display: flex; gap: 20px; margin-bottom: 30px; }
 .chart-card { background: white; border-radius: 16px; padding: 25px; border: 1px solid #E2E8F0; box-shadow: 0 4px 15px rgba(0,0,0,0.03); }
 .chart-large { flex: 2; }
@@ -752,6 +756,11 @@ const startGame = () => {
 .text-red { color: #FC8181; }
 .reviewed-status { display: inline-flex; align-items: center; gap: 6px; color: #047857; font-weight: 700; font-size: 0.85rem;}
 .pending-status { color: #94A3B8; font-style: italic; font-size: 0.85rem;}
+
+/* NOUVEAUX STYLES POUR LA COURBE SVG DANS LE DOSSIER PATIENT */
+.h-chart-effort { background: white; border-radius: 8px; padding: 15px; border: 1px solid #E2E8F0; }
+.chart-label-mini { font-size: 0.75rem; font-weight: 800; color: #0A192F; text-transform: uppercase; margin-bottom: 8px; display: block;}
+.mini-svg-chart { width: 100%; height: 60px; display: block;}
 
 /* TAB MESSAGERIE */
 .chat-container { background: white; border-radius: 16px; border: 1px solid #E2E8F0; display: flex; flex-direction: column; height: 600px; overflow: hidden; box-shadow: 0 4px 20px rgba(0,0,0,0.03);}

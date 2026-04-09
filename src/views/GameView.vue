@@ -2,7 +2,7 @@
   <div class="game-container">
     <div class="game-header">
       <button class="back-btn" @click="quitGame">← Quitter l'exercice</button>
-      <h2>Séance en cours : {{ gameTheme }} ({{ equipment }})</h2>
+      <h2>{{ gameTheme }} | <span class="timer-text">{{ timeRemainingText }}</span></h2>
       <button class="btn-toggle-players" @click="showLivePlayers = !showLivePlayers">
         👥 Joueurs en ligne ({{ livePlayers.length }})
       </button>
@@ -12,6 +12,7 @@
       <div class="game-wrapper">
         <canvas id="game" width="300" height="500"></canvas>
         <p id="description" class="game-description">Pédalez fort pour commencer !</p>
+        <div v-if="hasWon" class="victory-banner">🎉 SÉANCE TERMINÉE ! 🎉</div>
       </div>
 
       <div class="live-players-sidebar" :class="{ 'is-open': showLivePlayers }">
@@ -66,7 +67,7 @@
         </div>
 
         <div class="my-rank-info">
-          Votre position : <strong>#{{ myRank }}</strong> sur {{ sortedLeaderboard.length }} avec {{ finalScore * 10 }} pts
+          Votre position : #{{ myRank }} sur {{ sortedLeaderboard.length }} — Score : {{ finalScore * 10 }} pts
         </div>
 
         <div class="stats-row">
@@ -98,12 +99,6 @@
           {{ saving ? 'Enregistrement...' : 'ENREGISTRER' }}
         </button>
 
-        <transition name="fade">
-          <div v-if="saveMessage" class="save-confirmation" :class="saveMessageType">
-            {{ saveMessage }}
-          </div>
-        </transition>
-
       </div>
     </div>
   </div>
@@ -112,44 +107,59 @@
 <script setup>
 import { onMounted, onUnmounted, ref, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import protocolesCliniquesJSON from '../data/protocoles.json'
 
 const route = useRoute()
 const router = useRouter()
 
 const playerAvatarId = route.query.avatar || 'avatar1' 
-const gameTheme = route.query.theme || 'Classique'
 const equipment = route.query.equip || 'Vélo'
 const isGuest = route.query.from === 'guest'
 
 const isGameOver = ref(false)
+const hasWon = ref(false)
 const showEndScreen = ref(false)
 const finalScore = ref(0)
-const sessionDuration = ref("0m 30s") 
+const sessionDuration = ref("0 min") 
+const timeRemainingText = ref("Chargement...")
+
+// Variables pour le formulaire de fin
 const rating = ref(3)
 const difficulty = ref('Moyen')
 const saving = ref(false)
-const saveMessage = ref('')
-const saveMessageType = ref('success')
 const showLivePlayers = ref(false)
+
+const effortData = ref([])
 
 let sessionStartTime = null
 let sessionEndTime = null
 let gameLoopInterval = null
 let handleInput = null
 
-// --- DONNÉES SIMULÉES POUR LES JOUEURS EN LIGNE ---
+// --- MAPPING SÉCURISÉ DU NOM DU THÈME ---
+let themeURL = route.query.theme ? decodeURIComponent(route.query.theme) : "L'Aube Douce";
+let themeStr = String(themeURL).toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+let safeKey = "L'Aube Douce"; 
+
+if (themeStr.includes("sylvestre") || themeStr.includes("foret")) safeKey = "L'Échappée Sylvestre";
+else if (themeStr.includes("ocean") || themeStr.includes("souffle") || themeStr.includes("plage")) safeKey = "Souffle Océanique";
+else if (themeStr.includes("jardin") || themeStr.includes("sens")) safeKey = "Le Jardin des Sens";
+else if (themeStr.includes("alpin") || themeStr.includes("ascension") || themeStr.includes("montagne")) safeKey = "L'Ascension Alpine";
+else if (themeStr.includes("aerien") || themeStr.includes("voyage") || themeStr.includes("ciel")) safeKey = "Voyage Aérien";
+
+const gameTheme = ref(safeKey); 
+
 const livePlayers = ref([
   { name: 'Marc L.', score: 850, isMe: false },
   { name: 'Sophie D.', score: 520, isMe: false },
-  { name: 'Invité_842', score: 310, isMe: false },
-  { name: 'Invité_911', score: 120, isMe: false },
+  { name: 'Jean D.', score: 310, isMe: false },
+  { name: 'Riyad B.', score: 120, isMe: false },
   { name: isGuest ? 'Vous (Invité)' : 'Vous', score: 0, isMe: true }
 ])
 
 const sortedLeaderboard = computed(() => {
   return [...livePlayers.value].sort((a, b) => b.score - a.score)
 })
-
 const myRank = computed(() => {
   return sortedLeaderboard.value.findIndex(p => p.isMe) + 1
 })
@@ -167,56 +177,38 @@ onMounted(() => {
   imgAvatar.src = `/images/${formattedFileName}.png`;
 
   const themeAssets = {
-    "L'Aube Douce":         { bg: '/images/bg-nature.png',   obs: '/images/obs-nature.png',   sky: '#F0E68C' },
-    "L'Échappée Sylvestre": { bg: '/images/bg-foret.png',    obs: '/images/obs-foret.png',    sky: '#8FBC8F' },
-    "Souffle Océanique":    { bg: '/images/bg-plage.png',    obs: '/images/obs-plage.png',    sky: '#00BFFF' },
-    "Le Jardin des Sens":   { bg: '/images/bg-jardin.png',   obs: '/images/obs-jardin.png',   sky: '#FFB6C1' },
-    "L'Ascension Alpine":   { bg: '/images/bg-montagne.png', obs: '/images/obs-montagne.png', sky: '#D2B48C' },
-    "Voyage Aérien":        { bg: '/images/bg-ciel.png',     obs: '/images/obs-ciel.png',     sky: '#9370DB' },
-    'Classique':            { bg: '/images/og-theme.png',    obs: '/images/og-theme-2.png',   sky: '#00bbc4' }
+    "L'Aube Douce":         { bg: '/images/bg-nature.png',   sky: '#F0E68C' },
+    "L'Échappée Sylvestre": { bg: '/images/bg-foret.png',    sky: '#8FBC8F' },
+    "Souffle Océanique":    { bg: '/images/bg-plage.png',    sky: '#00BFFF' },
+    "Le Jardin des Sens":   { bg: '/images/bg-jardin.png',   sky: '#FFB6C1' },
+    "L'Ascension Alpine":   { bg: '/images/bg-montagne.png', sky: '#D2B48C' },
+    "Voyage Aérien":        { bg: '/images/bg-ciel.png',     sky: '#9370DB' }
   }
 
-  // --- CONFIGURATION DYNAMIQUE DES VITESSES INSPIRÉE DU JSON ---
-  // On mappe les vitesses du JSON sur nos noms originaux
-  const speedConfig = {
-    "L'Aube Douce": 10.0,         // (Inspiré de L'Abligeoise)
-    "L'Échappée Sylvestre": 1.0,  // (Inspiré de Montagne russe)
-    "Souffle Océanique": 7.0,     // (Inspiré de Gambette)
-    "Le Jardin des Sens": 12.0,   // (Inspiré de Challenge)
-    "L'Ascension Alpine": 15.0,   // (Inspiré de UltraSpeed)
-    "Voyage Aérien": 12.0,        // (Inspiré de Hardcore)
-    "Classique": 2.0
-  }
+  let activeConfig = protocolesCliniquesJSON[safeKey] || protocolesCliniquesJSON["L'Aube Douce"]; 
+  let currentThemeAssets = themeAssets[safeKey] || themeAssets["L'Aube Douce"];
 
-  let jsonSpeed = speedConfig[gameTheme] || 2.0; 
-  let jsonGap = 100;
-  
-  if(jsonSpeed > 10) jsonGap = 120; 
-  if(jsonSpeed < 5) jsonGap = 80;   
+  const sequenceObstacles = activeConfig.obstaclesManager.split(' ');
+  const sequenceDistances = activeConfig.distanceManager.split(' ').map(Number);
+  const jsonSpeed = activeConfig.vitesseDefilement;
+  const dureeTotaleSecondes = activeConfig.dureeMinutes * 60; 
 
-  const currentConfig = { gap: jsonGap, freq: 100, speed: jsonSpeed };
-  const currentThemeAssets = themeAssets[gameTheme] || themeAssets['Classique'];
+  timeRemainingText.value = `Cible : ${activeConfig.dureeMinutes} min`;
+
   let skyColor = currentThemeAssets.sky;
-
   let customBg = new Image(); 
   customBg.src = currentThemeAssets.bg;
-  
   let customBgLoaded = false;
   customBg.onload = () => { customBgLoaded = true; };
-  customBg.onerror = () => { customBgLoaded = false; };
-
-  let customObs = new Image(); 
-  customObs.src = currentThemeAssets.obs;
 
   let frame = 0; let degree = Math.PI/180
-  
   const SFX_SCORE = new Audio(); const SFX_FLAP = new Audio(); const SFX_COLLISION = new Audio(); const SFX_FALL = new Audio(); const SFX_SWOOSH = new Audio() 
   SFX_SCORE.src = '/audio/sfx_point.wav'; SFX_FLAP.src = '/audio/sfx_wing.wav'; SFX_COLLISION.src = '/audio/sfx_hit.wav'; SFX_FALL.src = '/audio/sfx_die.wav'; SFX_SWOOSH.src = '/audio/sfx_swooshing.wav'
 
   let gameState = { current: 0, getReady: 0, play: 1, gameOver: 2 }
 
   let bg = { 
-    dx: currentConfig.speed * 0.2, // Le fond défile plus lentement que les obstacles
+    dx: jsonSpeed * 0.2, 
     x: 0, classicImgX: 0, classicImgY: 0, classicWidth: 276, classicHeight: 228,
     render: function() { 
       if (customBgLoaded && customBg.naturalWidth > 0) {
@@ -224,12 +216,11 @@ onMounted(() => {
         ctx.drawImage(customBg, this.x, drawY, repeatW, drawH); 
         ctx.drawImage(customBg, this.x + repeatW, drawY, repeatW, drawH); 
         ctx.drawImage(customBg, this.x + repeatW * 2, drawY, repeatW, drawH);
-      } 
-      else if (spriteUI.complete && spriteUI.naturalWidth > 0) { 
+      } else if (spriteUI.complete && spriteUI.naturalWidth > 0) { 
         let classicDrawY = cvs.height - this.classicHeight;
         ctx.drawImage(spriteUI, this.classicImgX, this.classicImgY, this.classicWidth, this.classicHeight, this.classicX, classicDrawY, this.classicWidth, this.classicHeight); 
         ctx.drawImage(spriteUI, this.classicImgX, this.classicImgY, this.classicWidth, this.classicHeight, this.classicX + this.classicWidth, classicDrawY, this.classicWidth, this.classicHeight); 
-      } 
+      }
     }, 
     position: function () { 
       let repeatWidth = (customBgLoaded && customBg.naturalWidth > 0) ? cvs.width : this.classicWidth;
@@ -238,55 +229,64 @@ onMounted(() => {
         this.x = (this.x - this.dx) % repeatWidth;
         this.classicX = (this.classicX - this.dx) % this.classicWidth;
       } 
-    },
-    classicX: 0
+    }
   }
 
   let pipes = { 
-    top: { imgX: 56, imgY: 323 }, bot: { imgX: 84, imgY:323 }, 
-    width: 26, height: 160, w: 55, h: 300, 
-    gap: currentConfig.gap, 
-    dx: currentConfig.speed, // Vitesse de défilement configurée
-    minY: -260, maxY: -40, pipeGenerator: [], 
-    reset: function() { this.pipeGenerator = [] }, 
+    top: { imgX: 56, imgY: 323 }, bot: { imgX: 84, imgY: 323 }, imgW: 26, imgH: 160,          
+    w: 55, dx: jsonSpeed, 
+    obsSequence: sequenceObstacles, distSequence: sequenceDistances,
+    currentObsIndex: 0, distanceCounter: 0, pipeArray: [], 
+    reset: function() { this.pipeArray = []; this.currentObsIndex = 0; this.distanceCounter = 0; hasWon.value = false; }, 
     render: function() { 
-      for (let i = 0; i < this.pipeGenerator.length; i++) { 
-        let pipe = this.pipeGenerator[i]; 
-        let topPipe = pipe.y; 
-        let bottomPipe = pipe.y + this.gap + this.h; 
-        
-        if (customObs.complete && customObs.naturalWidth > 0) {
-          ctx.save(); ctx.translate(pipe.x + this.w/2, topPipe + this.h/2); ctx.scale(1, -1); ctx.drawImage(customObs, -this.w/2, -this.h/2, this.w, this.h); ctx.restore(); ctx.drawImage(customObs, pipe.x, bottomPipe, this.w, this.h);
-        } 
-        else if(spriteNumbers.complete && spriteNumbers.naturalWidth > 0) {
-          ctx.drawImage(spriteNumbers, this.top.imgX,this.top.imgY,this.width,this.height, pipe.x,topPipe,this.w,this.h); 
-          ctx.drawImage(spriteNumbers, this.bot.imgX,this.bot.imgY,this.width,this.height, pipe.x,bottomPipe,this.w,this.h) 
+      for (let i = 0; i < this.pipeArray.length; i++) { 
+        let p = this.pipeArray[i]; 
+        if (spriteNumbers.complete && spriteNumbers.naturalWidth > 0) {
+          if (p.isTop) ctx.drawImage(spriteNumbers, this.top.imgX, this.top.imgY, this.imgW, this.imgH, p.x, p.y, this.w, p.h);
+          else ctx.drawImage(spriteNumbers, this.bot.imgX, this.bot.imgY, this.imgW, this.imgH, p.x, p.y, this.w, p.h);
         }
       } 
     }, 
     position: function() { 
       if (gameState.current !== gameState.play) return; 
-      
-      let adjustedFreq = Math.max(20, Math.floor(150 / currentConfig.speed));
-      
-      if (frame % adjustedFreq == 0) { 
-        this.pipeGenerator.push({ x: cvs.width, y: Math.floor((Math.random() * (this.maxY-this.minY+1)) + this.minY) }) 
-      }; 
-      
-      for (let i = 0; i < this.pipeGenerator.length; i++) { 
-        let pg = this.pipeGenerator[i]; 
-        let b = { left: bird.x - bird.r, right: bird.x + bird.r, top: bird.y - bird.r, bottom: bird.y + bird.r }; 
-        let p = { top: { top: pg.y, bottom: pg.y + this.h }, bot: { top: pg.y + this.h + this.gap, bottom: pg.y + this.h*2 + this.gap }, left: pg.x, right: pg.x + this.w }; 
-        pg.x -= this.dx; 
+      if (hasWon.value) return;
+
+      this.distanceCounter += this.dx;
+
+      if (this.currentObsIndex < this.distSequence.length && this.distanceCounter >= this.distSequence[this.currentObsIndex] * 10) {
+        let typeObs = this.obsSequence[this.currentObsIndex];
+        let spawnY = 0; let obsHeight = 150; let isTop = false;
+
+        if (typeObs === 'x1') { isTop = true; spawnY = 0; obsHeight = 160; } 
+        if (typeObs === 'x2') { isTop = true; spawnY = 0; obsHeight = 240; } 
+        if (typeObs === 'y1') { isTop = false; obsHeight = 160; spawnY = 388 - obsHeight; } 
+        if (typeObs === 'y2') { isTop = false; obsHeight = 240; spawnY = 388 - obsHeight; } 
+
+        if (typeObs !== 'z') {
+           this.pipeArray.push({ x: cvs.width, y: spawnY, h: obsHeight, isTop: isTop, passed: false });
+        }
         
-        if(pg.x < -this.w) { this.pipeGenerator.shift(); score.current++; SFX_SCORE.play().catch(()=>{}) }; 
-        if (b.left < p.right && b.right > p.left && b.top < p.top.bottom && b.bottom > p.top.top) { gameState.current = gameState.gameOver; SFX_COLLISION.play().catch(()=>{}) }; 
-        if (b.left < p.right && b.right > p.left && b.top < p.bot.bottom && b.bottom > p.bot.top) { gameState.current = gameState.gameOver; SFX_COLLISION.play().catch(()=>{}) } 
+        this.distanceCounter = 0;
+        this.currentObsIndex = (this.currentObsIndex + 1) % this.obsSequence.length;
+        if (this.obsSequence[this.currentObsIndex] === 'z') this.currentObsIndex = 0; 
+      }
+
+      for (let i = 0; i < this.pipeArray.length; i++) { 
+        let p = this.pipeArray[i]; 
+        let bBox = { left: bird.x - bird.r + 8, right: bird.x + bird.r - 8, top: bird.y - bird.r + 8, bottom: bird.y + bird.r - 8 }; 
+        let pBox = { left: p.x + 5, right: p.x + this.w - 5, top: p.y, bottom: p.y + p.h }; 
+        p.x -= this.dx; 
+        
+        if(p.x + this.w < bird.x && !p.passed) { score.current++; p.passed = true; SFX_SCORE.play().catch(()=>{}); }; 
+        if(p.x + this.w < 0) { this.pipeArray.shift(); i--; continue; }
+        if (!hasWon.value && bBox.left < pBox.right && bBox.right > pBox.left && bBox.top < pBox.bottom && bBox.bottom > pBox.top) { 
+          gameState.current = gameState.gameOver; SFX_COLLISION.play().catch(()=>{});
+        } 
       } 
     } 
   }
 
-  let ground = { imgX: 276, imgY: 0, width: 224, height: 112, x: 0, y:cvs.height - 112, w:224, h:112, dx: currentConfig.speed, render: function() { if(spriteUI.complete && spriteUI.naturalWidth > 0){ ctx.drawImage(spriteUI, this.imgX,this.imgY,this.width,this.height, this.x,this.y,this.w,this.h); ctx.drawImage(spriteUI, this.imgX,this.imgY,this.width,this.height, this.x + this.width,this.y,this.w,this.h) } }, position: function() { if (gameState.current == gameState.getReady) { this.x = 0 }; if (gameState.current == gameState.play) { this.x = (this.x-this.dx) % (this.w/2) } } }
+  let ground = { imgX: 276, imgY: 0, width: 224, height: 112, x: 0, y:cvs.height - 112, w:224, h:112, dx: jsonSpeed, render: function() { if(spriteUI.complete && spriteUI.naturalWidth > 0){ ctx.drawImage(spriteUI, this.imgX,this.imgY,this.width,this.height, this.x,this.y,this.w,this.h); ctx.drawImage(spriteUI, this.imgX,this.imgY,this.width,this.height, this.x + this.width,this.y,this.w,this.h) } }, position: function() { if (gameState.current == gameState.getReady) { this.x = 0 }; if (gameState.current == gameState.play) { this.x = (this.x-this.dx) % (this.w/2) } } }
   
   let map = [ { imgX: 496, imgY: 60, width: 12, height: 18 }, { imgX: 135, imgY: 455, width: 10, height: 18 }, { imgX: 292, imgY: 160, width: 12, height: 18 }, { imgX: 306, imgY: 160, width: 12, height: 18 }, { imgX: 320, imgY: 160, width: 12, height: 18 }, { imgX: 334, imgY: 160, width: 12, height: 18 }, { imgX: 292, imgY: 184, width: 12, height: 18 }, { imgX: 306, imgY: 184, width: 12, height: 18 }, { imgX: 320, imgY: 184, width: 12, height: 18 }, { imgX: 334, imgY: 184, width: 12, height: 18 } ]
   let score = { current: 0, x: cvs.width/2, y: 40, w: 15, h: 25, reset: function() { this.current = 0 }, render: function() { if(!spriteNumbers.complete || spriteNumbers.naturalWidth === 0) return; if (gameState.current == gameState.play || gameState.current == gameState.gameOver) { let string = this.current.toString(); let ones = string.charAt(string.length-1); let tens = string.charAt(string.length-2); if (this.current >= 10) { ctx.drawImage(spriteNumbers, map[ones].imgX,map[ones].imgY,map[ones].width,map[ones].height, ( (this.x-this.w/2) + (this.w/2) + 3 ),this.y,this.w,this.h); ctx.drawImage(spriteNumbers, map[tens].imgX,map[tens].imgY,map[tens].width,map[tens].height, ( (this.x-this.w/2) - (this.w/2) - 3 ),this.y,this.w,this.h) } else { ctx.drawImage(spriteNumbers, map[ones].imgX,map[ones].imgY,map[ones].width,map[ones].height, ( this.x-this.w/2 ),this.y,this.w,this.h) } } } }
@@ -302,7 +302,9 @@ onMounted(() => {
       flap: function() { this.velocity = - this.fly },
       position: function() {
           if (gameState.current == gameState.getReady) { this.y = 160; this.rotation = 0 * degree } else {
-              this.velocity += this.gravity; this.y += this.velocity
+              if (hasWon.value) { this.velocity = 0; this.rotation = 0; }
+              else { this.velocity += this.gravity; this.y += this.velocity; }
+              
               if (this.velocity <= this.fly) { this.rotation = -15 * degree } else if (this.velocity >= this.fly+2) { this.rotation = 70 * degree; } else { this.rotation = 0 }
               if (this.y+this.h/2 >= cvs.height-ground.h) { this.y = cvs.height-ground.h - this.h/2; if (gameState.current == gameState.play) { gameState.current = gameState.gameOver; SFX_FALL.play().catch(()=>{}) } }
               if (this.y-this.h/2 <= 0) { this.y = this.r }
@@ -311,7 +313,7 @@ onMounted(() => {
   }
 
   let getReady = { imgX: 0, imgY: 228, width: 174, height: 160, x: cvs.width/2 - 174/2, y: cvs.height/2 - 160, w: 174, h: 160, render: function() { if(spriteUI.complete && spriteUI.naturalWidth > 0 && gameState.current == gameState.getReady) { ctx.drawImage(spriteUI, this.imgX,this.imgY,this.width,this.height, this.x,this.y,this.w,this.h) } } }
-  let gameOver = { render: function() { if(gameState.current == gameState.gameOver) { description.style.visibility = "visible"; description.innerHTML = "Oups ! Pédalez pour recommencer." } } }
+  let gameOver = { render: function() { if(gameState.current == gameState.gameOver && !hasWon.value) { description.style.visibility = "visible"; description.innerHTML = "Oups ! Pédalez pour recommencer." } } }
 
   let draw = () => {
       ctx.fillStyle = skyColor; ctx.fillRect(0,0, cvs.width,cvs.height)
@@ -321,24 +323,42 @@ onMounted(() => {
   let update = () => { bird.position(); bg.position(); pipes.position(); ground.position() }
 
   let loop = () => {
-      draw(); update(); frame++
+      draw(); update(); frame++;
       
       if (gameState.current === gameState.play) {
-        if (!sessionStartTime) sessionStartTime = Date.now()
+        if (!sessionStartTime) sessionStartTime = Date.now();
         
+        let elapsedSeconds = (Date.now() - sessionStartTime) / 1000;
+        let remainingSeconds = Math.max(0, dureeTotaleSecondes - elapsedSeconds);
+        
+        let m = Math.floor(remainingSeconds / 60);
+        let s = Math.floor(remainingSeconds % 60);
+        timeRemainingText.value = `Reste : ${m}:${s < 10 ? '0' : ''}${s}`;
+
+        if (elapsedSeconds >= dureeTotaleSecondes && !hasWon.value) {
+           if (pipes.pipeArray.length === 0) {
+             hasWon.value = true;
+             setTimeout(() => { gameState.current = gameState.gameOver; }, 1500);
+           }
+        }
+
+        if (frame % 30 === 0 && !hasWon.value) {
+          effortData.value.push({ time: elapsedSeconds, y: bird.y });
+        }
+
         let me = livePlayers.value.find(p => p.isMe)
         if (me) me.score = score.current * 10;
-        
-        livePlayers.value.forEach(p => {
-          if(!p.isMe && Math.random() < 0.01) p.score += 10;
-        })
+        livePlayers.value.forEach(p => { if(!p.isMe && Math.random() < 0.01) p.score += 10; })
       }
 
       if(gameState.current === gameState.gameOver) {
           if (!sessionEndTime) {
               sessionEndTime = Date.now()
-              const elapsed = sessionStartTime ? Math.max(1, Math.round((sessionEndTime - sessionStartTime) / 60000)) : 1
-              sessionDuration.value = elapsed + ' min'
+              let elapsed = sessionStartTime ? Math.round((sessionEndTime - sessionStartTime) / 1000) : 0;
+              let m = Math.floor(elapsed / 60);
+              let s = Math.floor(elapsed % 60);
+              // Rendu propre "1 min" ou "1 min 30s"
+              sessionDuration.value = s > 0 ? `${m} min ${s}s` : `${m} min`;
           }
           isGameOver.value = true;
           finalScore.value = score.current;
@@ -355,7 +375,7 @@ onMounted(() => {
       if (showEndScreen.value) return; 
       if (gameState.current == gameState.getReady) { gameState.current = gameState.play }
       if (gameState.current == gameState.play) { bird.flap(); SFX_FLAP.play().catch(()=>{}); description.style.visibility = "hidden" }
-      if (gameState.current == gameState.gameOver) { pipes.reset(); score.reset(); SFX_SWOOSH.play().catch(()=>{}); gameState.current = gameState.getReady; description.innerHTML = "Pédalez fort pour commencer !"; sessionStartTime = null; sessionEndTime = null; sessionDuration.value = "--"; }
+      if (gameState.current == gameState.gameOver && !hasWon.value) { pipes.reset(); score.reset(); effortData.value = []; SFX_SWOOSH.play().catch(()=>{}); gameState.current = gameState.getReady; description.innerHTML = "Pédalez fort pour commencer !"; sessionStartTime = null; sessionEndTime = null; timeRemainingText.value = `Durée cible : ${activeConfig.dureeMinutes} min`; }
   }
 
   cvs.addEventListener('click', handleInput)
@@ -369,21 +389,12 @@ const quitGame = () => {
 
 const saveAndReturn = () => {
   saving.value = true
-  saveMessage.value = ''
   const returnPath = route.query.from === 'guest' ? '/guest-dashboard' : '/patient-dashboard'
 
   setTimeout(() => {
-    saveMessageType.value = 'success'
-    saveMessage.value = 'Séance enregistrée avec succès !'
-    
-    setTimeout(() => {
-      saving.value = false
-      router.push({ 
-        path: returnPath, 
-        query: { finished: true, score: finalScore.value * 10, diff: difficulty.value } 
-      })
-    }, 1000)
-  }, 800)
+    saving.value = false
+    router.push({ path: returnPath, query: { finished: true, score: finalScore.value * 10, diff: difficulty.value } })
+  }, 1000)
 }
 
 onUnmounted(() => {
@@ -393,136 +404,83 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
-.game-container { display: flex; flex-direction: column; align-items: center; min-height: 100vh; background-color: #0A192F; color: white; padding: 30px 20px; font-family: 'Nunito', sans-serif; transition: 0.3s;}
+.game-container { display: flex; flex-direction: column; align-items: center; min-height: 100vh; background-color: #0A192F; color: white; padding: 30px 20px; font-family: 'Nunito', sans-serif;}
 .game-header { width: 100%; max-width: 900px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
-.game-header h2 { color: #00B8D9; font-size: 1.5rem; font-weight: 900; text-align: center; margin: 0;}
+.game-header h2 { color: #00B8D9; font-size: 1.2rem; font-weight: 900; text-align: center; margin: 0; flex: 1;}
+.timer-text { color: #20C997; font-weight: 900; margin-left: 10px; background: rgba(32, 201, 151, 0.1); padding: 4px 12px; border-radius: 20px;}
 .back-btn { background: transparent; border: 2px solid #6B7C93; color: white; padding: 10px 20px; border-radius: 50px; cursor: pointer; transition: 0.3s; font-weight: bold; align-self: flex-start; }
 .back-btn:hover { background: white; color: #0A192F; }
 
 .btn-toggle-players { background: #EAF7F9; color: #00B8D9; border: none; padding: 10px 20px; border-radius: 50px; cursor: pointer; font-weight: bold; transition: 0.2s;}
 .btn-toggle-players:hover { background: white; }
 
-.game-layout {
-  display: flex;
-  gap: 30px;
-  align-items: flex-start;
-  max-width: 900px;
-  width: 100%;
-  justify-content: center;
-  position: relative;
-  overflow: hidden;
-}
-
+.game-layout { display: flex; gap: 30px; align-items: flex-start; max-width: 900px; width: 100%; justify-content: center; position: relative;}
 .game-wrapper { position: relative; border: 10px solid #1C2833; border-radius: 20px; background: #333; box-shadow: 0 20px 50px rgba(0,0,0,0.5); display: flex; justify-content: center; width: 100%; max-width: 450px; overflow: hidden; z-index: 5;}
 canvas { display: block; width: 100%; height: auto; image-rendering: pixelated; }
 .game-description { position: absolute; bottom: 20px; left: 0; width: 100%; text-align: center; color: #1C2833; font-weight: 900; font-size: 1.1rem; background: rgba(255, 255, 255, 0.8); padding: 10px 0; }
+.victory-banner { position: absolute; top: 30%; left: 0; width: 100%; text-align: center; color: white; background: #20C997; padding: 15px 0; font-size: 1.5rem; font-weight: 900; animation: popIn 0.5s ease; box-shadow: 0 10px 20px rgba(32,201,151,0.4);}
+@keyframes popIn { 0% { transform: scale(0.5); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
 
-/* PANNEAU LATÉRAL MULTIJOUEUR */
-.live-players-sidebar {
-  width: 280px;
-  background: white;
-  border: 1px solid #E2E8F0;
-  border-radius: 16px;
-  box-shadow: 0 10px 30px rgba(0,0,0,0.05);
-  padding: 20px;
-  transition: transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-  color: #1C2833;
-}
-
-@media (max-width: 800px) {
-  .live-players-sidebar {
-    position: absolute;
-    right: 0;
-    top: 0;
-    height: 100%;
-    transform: translateX(120%);
-    z-index: 10;
-  }
-  .live-players-sidebar.is-open {
-    transform: translateX(0);
-  }
-}
-
-.sidebar-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 15px; border-bottom: 1px solid #E2E8F0; padding-bottom: 10px;}
+.live-players-sidebar { width: 280px; background: white; border-radius: 16px; padding: 20px; color: #1C2833;}
+.sidebar-header { display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid #E2E8F0; padding-bottom: 10px; margin-bottom: 15px;}
 .sidebar-header h3 { font-size: 1.1rem; color: #0A192F; margin: 0; font-weight: 900; display: flex; align-items: center; gap: 8px;}
-.live-dot { width: 10px; height: 10px; background: #EF4444; border-radius: 50%; animation: pulse 1.5s infinite; }
+.live-dot { width: 10px; height: 10px; background: #EF4444; border-radius: 50%; animation: pulse 1.5s infinite; display: inline-block; margin-right: 5px;}
 .close-sidebar { background: none; border: none; font-size: 1.5rem; color: #6B7C93; cursor: pointer;}
-.close-sidebar:hover { color: #00B8D9;}
-
 .players-list { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 12px;}
 .players-list li { display: flex; align-items: center; gap: 10px; position: relative;}
 .player-avatar { width: 35px; height: 35px; background: #F8FAFC; border-radius: 50%; display: flex; justify-content: center; align-items: center; font-weight: bold; color: #0A192F; border: 1px solid #E2E8F0;}
 .player-info { display: flex; flex-direction: column; line-height: 1.2;}
-.player-name { font-size: 0.9rem; font-weight: 700; color: #1C2833;}
+.player-name { font-size: 0.9rem; font-weight: 700; display: block;}
 .player-score { font-size: 0.8rem; color: #20C997; font-weight: 900;}
-
-.players-list li.is-me .player-avatar { background: #00B8D9; color: white; border-color: #00B8D9;}
-.players-list li.is-me .player-name { color: #00B8D9; font-weight: 900;}
+.players-list li.is-me .player-avatar { background: #00B8D9; color: white;}
 .you-badge { position: absolute; right: 0; background: #00B8D9; color: white; font-size: 0.65rem; padding: 2px 6px; border-radius: 10px; font-weight: bold; text-transform: uppercase;}
-
 @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.4; } 100% { opacity: 1; } }
 
-/* MODALE DE FIN ET PODIUM */
+/* --- CSS DU MODAL EXACTEMENT COMME IMAGE 1 --- */
 .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(10,25,47,0.9); z-index: 1000; display: flex; justify-content: center; align-items: center; opacity: 0; visibility: hidden; transition: 0.3s; padding: 20px; }
 .modal-overlay.active { opacity: 1; visibility: visible; }
-.end-modal { background: white; width: 100%; max-width: 450px; border-radius: 24px; border: 1px solid #E2E8F0; padding: 30px; text-align: center; color: #1C2833; transform: translateY(30px); transition: 0.3s; box-shadow: 0 25px 50px rgba(0,0,0,0.5); max-height: 90vh; overflow-y: auto;}
+.end-modal { background: white; width: 100%; max-width: 400px; border-radius: 20px; padding: 30px; text-align: center; color: #1C2833; transform: translateY(30px); transition: 0.3s; max-height: 90vh; overflow-y: auto;}
 .modal-overlay.active .end-modal { transform: translateY(0); }
 
 .modal-header-end { display: flex; flex-direction: column; align-items: center; margin-bottom: 5px; }
-.trophy-icon { font-size: 3rem; margin-bottom: 5px; }
-.modal-header-end h3 { font-size: 1.5rem; color: #6B7C93; margin: 0;}
-.bravo-text { font-weight: 800; font-size: 1.2rem; margin-bottom: 15px; color: #0A192F;}
+.trophy-icon { font-size: 2.5rem; margin-bottom: 5px; }
+.modal-header-end h3 { font-size: 1.4rem; color: #6B7C93; margin: 10px 0 5px 0; font-weight: 700;}
+.bravo-text { font-weight: 900; font-size: 1.2rem; margin-bottom: 25px; color: #0A192F;}
 
-/* LE PODIUM */
-.podium-container { 
-  display: flex; 
-  align-items: flex-end; 
-  justify-content: center; 
-  gap: 8px; 
-  height: 120px; 
-  margin-bottom: 20px; 
-  border-bottom: 2px solid #E2E8F0; 
-  padding-bottom: 10px;
-}
+/* PODIUM FLAT DESIGN */
+.podium-container { display: flex; align-items: flex-end; justify-content: center; gap: 10px; height: 110px; margin-bottom: 20px; }
 .podium-place { display: flex; flex-direction: column; align-items: center; width: 30%; position: relative; }
-.medal { font-size: 1.8rem; margin-bottom: -10px; z-index: 2; line-height: 1;}
-.place-1 .medal { font-size: 2.2rem; margin-bottom: -15px; }
+.medal { font-size: 1.5rem; margin-bottom: -10px; z-index: 2; line-height: 1;}
+.place-1 .medal { font-size: 1.8rem; margin-bottom: -12px; }
 
-.podium-bar { width: 100%; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; padding-bottom: 8px; border-top-left-radius: 8px; border-top-right-radius: 8px; box-shadow: 0 -2px 10px rgba(0,0,0,0.1); }
-.silver { height: 60px; background: linear-gradient(to top, #94A3B8, #E2E8F0); border: 1px solid #94A3B8; }
-.gold { height: 90px; background: linear-gradient(to top, #F59E0B, #FDE68A); border: 1px solid #D97706; }
-.bronze { height: 40px; background: linear-gradient(to top, #B45309, #FDE047); border: 1px solid #92400E; }
+.podium-bar { width: 100%; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; padding-bottom: 10px; border-radius: 6px 6px 0 0; }
+.silver { height: 60px; background: #A0AEC0; }
+.gold { height: 90px; background: #FFC107; }
+.bronze { height: 50px; background: #CD7F32; }
 
-.p-name { font-size: 0.7rem; font-weight: 800; color: #0A192F; text-overflow: ellipsis; overflow: hidden; white-space: nowrap; max-width: 95%; margin-bottom: 2px;}
-.p-score { font-size: 0.8rem; font-weight: 900; color: #0A192F; }
+.p-name { font-size: 0.7rem; font-weight: 800; color: white; text-overflow: ellipsis; overflow: hidden; white-space: nowrap; max-width: 95%; margin-bottom: 2px;}
+.p-score { font-size: 0.8rem; font-weight: 900; color: white; }
 
-.my-rank-info { background: #EAF7F9; padding: 10px; border-radius: 10px; margin-bottom: 20px; font-size: 0.95rem; color: #1C2833; border: 1px solid #00B8D9;}
-.my-rank-info strong { color: #00B8D9; font-size: 1.1rem; }
+.my-rank-info { font-size: 0.8rem; color: #6B7C93; margin-bottom: 25px;}
 
-.score-card { background: linear-gradient(135deg, #20C997 0%, #00B8D9 100%); color: white; padding: 15px; border-radius: 16px; margin-bottom: 20px; box-shadow: 0 5px 15px rgba(0, 184, 217, 0.3); }
-.score-card p { font-size: 0.8rem; opacity: 0.9; margin-bottom: 0px; font-weight: bold;}
-.score-card h2 { font-size: 2.5rem; font-weight: 900; line-height: 1; color: white; margin: 0;}
+/* STATS BOXES ÉPURÉES */
+.stats-row { display: flex; gap: 15px; margin-bottom: 25px; }
+.stat-box { flex: 1; background: #F8FAFC; padding: 15px; border-radius: 12px; display: flex; flex-direction: column; border: none;}
+.stat-box span { font-size: 0.75rem; color: #6B7C93; font-weight: 600; margin-bottom: 5px;}
+.stat-box strong { font-size: 1.1rem; color: #0A192F; font-weight: 900;}
 
-.stats-row { display: flex; gap: 15px; margin-bottom: 20px; }
-.stat-box { flex: 1; background: #F8FAFC; padding: 10px; border-radius: 12px; display: flex; flex-direction: column; border: 1px solid #E2E8F0;}
-.stat-box span { font-size: 0.75rem; color: #6B7C93; margin-bottom: 2px; }
-.stat-box strong { font-size: 1rem; color: #0A192F; }
-
-.feedback-section p { font-weight: 700; color: #6B7C93; margin-bottom: 5px; font-size: 0.85rem; }
-.stars-rating { font-size: 2rem; color: #E2E8F0; margin-bottom: 15px; cursor: pointer; display: flex; justify-content: center; gap: 5px;}
+/* ÉTOILES ET BOUTONS */
+.feedback-section { margin-bottom: 25px; }
+.feedback-section p { font-weight: 700; color: #6B7C93; margin-bottom: 10px; font-size: 0.85rem; }
+.stars-rating { font-size: 2.2rem; color: #E2E8F0; margin-bottom: 20px; cursor: pointer; display: flex; justify-content: center; gap: 8px;}
 .stars-rating span.active { color: #FFB800; }
 
-.difficulty-buttons { display: flex; gap: 10px; margin-bottom: 25px; }
-.difficulty-buttons button { flex: 1; padding: 10px 5px; border: 2px solid #E2E8F0; background: white; border-radius: 12px; cursor: pointer; font-weight: 700; color: #6B7C93; transition: 0.2s; font-size: 0.85rem;}
-.difficulty-buttons button.active { border-color: #FFB800; background: #FFF9E6; color: #FFB800; }
+.difficulty-buttons { display: flex; gap: 10px; }
+.difficulty-buttons button { flex: 1; padding: 10px 5px; border: 1px solid #E2E8F0; background: white; border-radius: 20px; cursor: pointer; font-weight: 700; color: #6B7C93; transition: 0.2s; font-size: 0.85rem;}
+.difficulty-buttons button.active { border-color: #FFB800; color: #FFB800; }
 
-.btn-save-score { width: 100%; padding: 16px; border: none; border-radius: 50px; background-color: #00B8D9; color: white; font-size: 1.1rem; font-weight: 800; cursor: pointer; box-shadow: 0 10px 20px rgba(0, 184, 217, 0.3); transition: 0.2s; }
-.btn-save-score:hover:not(:disabled) { transform: translateY(-2px); }
+/* BOUTON ENREGISTRER */
+.btn-save-score { width: 100%; padding: 16px; border: none; border-radius: 50px; background-color: #00B8D9; color: white; font-size: 1rem; font-weight: 900; cursor: pointer; transition: 0.2s; }
+.btn-save-score:hover:not(:disabled) { background-color: #0284C7; }
 .btn-save-score:disabled { opacity: 0.7; cursor: not-allowed; }
-
-.save-confirmation { margin-top: 15px; padding: 12px 20px; border-radius: 12px; font-weight: 700; font-size: 0.95rem; text-align: center; }
-.save-confirmation.success { background: #E8F8F5; color: #20C997; border: 1px solid #20C997;}
-
-.fade-enter-active, .fade-leave-active { transition: opacity 0.3s; }
-.fade-enter-from, .fade-leave-to { opacity: 0; }
 </style>
