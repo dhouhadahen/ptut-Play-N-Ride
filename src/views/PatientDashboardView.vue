@@ -162,7 +162,7 @@
       <div v-if="activeTab === 'historique'" class="tab-fade">
         <header class="content-header">
           <h1>Vos progrès cliniques</h1>
-          <p class="subtitle">Historique de vos séances partagé automatiquement avec votre praticien.</p>
+          <p class="subtitle">Historique de vos séances et analyse mathématique de vos efforts.</p>
         </header>
 
         <div class="history-stats-container">
@@ -195,138 +195,96 @@
           </div>
         </div>
 
-        <div class="charts-dashboard">
-          
-          <div class="chart-card chart-large">
-            <h3 class="chart-title">Évolution de vos performances (Score)</h3>
-            <div class="chart-container-axes">
-              <svg width="100%" height="100%" viewBox="0 0 650 240" class="svg-chart" preserveAspectRatio="xMidYMid meet">
-                
-                <text x="-120" y="15" transform="rotate(-90)" fill="#6B7C93" font-size="12" font-weight="bold" letter-spacing="1">SCORE OBTENU (pts)</text>
-
-                <g class="grid" stroke="#E2E8F0" stroke-width="1">
-                  <line x1="60" y1="20" x2="620" y2="20" stroke-dasharray="4"/>
-                  <text x="50" y="24" fill="#94A3B8" font-size="11" text-anchor="end" font-weight="bold">600</text>
-                  <line x1="60" y1="70" x2="620" y2="70" stroke-dasharray="4"/>
-                  <text x="50" y="74" fill="#94A3B8" font-size="11" text-anchor="end" font-weight="bold">400</text>
-                  <line x1="60" y1="120" x2="620" y2="120" stroke-dasharray="4"/>
-                  <text x="50" y="124" fill="#94A3B8" font-size="11" text-anchor="end" font-weight="bold">200</text>
-                  <line x1="60" y1="170" x2="620" y2="170" stroke="#CBD5E1" stroke-width="2" />
-                  <text x="50" y="174" fill="#94A3B8" font-size="11" text-anchor="end" font-weight="bold">0</text>
-                </g>
-                
-                <defs>
-                  <linearGradient id="barGradient" x1="0%" y1="100%" x2="0%" y2="0%">
-                    <stop offset="0%" stop-color="#00B8D9" />
-                    <stop offset="100%" stop-color="#20C997" />
-                  </linearGradient>
-                </defs>
-
-                <g v-for="(pt, i) in scoreBarPoints" :key="'bar-'+i">
-                  <rect :x="pt.x - 20" :y="pt.y" width="40" :height="pt.h" fill="url(#barGradient)" rx="4" class="data-bar">
-                    <title>{{ pt.score }} points ({{ pt.scenario }})</title>
-                  </rect>
-                  
-                  <text :x="pt.x" y="195" fill="#0A192F" font-size="11" font-weight="bold" text-anchor="middle">{{ pt.date }}</text>
-                </g>
-
-                <text x="340" y="230" fill="#6B7C93" font-size="12" font-weight="bold" letter-spacing="1" text-anchor="middle">DATE DE LA SÉANCE</text>
-              </svg>
-            </div>
-          </div>
-
-          <div class="chart-card chart-small">
-            <h3 class="chart-title">Répartition des séances</h3>
-            <div class="donut-wrapper">
-              <svg viewBox="0 0 36 36" class="circular-chart">
-                <path class="circle-bg" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
-                <path class="circle libre-segment" :stroke-dasharray="`${percentLibre}, 100`" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
-                <path class="circle prescrit-segment" :stroke-dasharray="`${percentPrescrit}, 100`" :stroke-dashoffset="`-${percentLibre}`" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
-                <text x="18" y="18" class="donut-number">{{ historyData.length }}</text>
-                <text x="18" y="23" class="donut-label">Séances</text>
-              </svg>
-              
-              <div class="donut-legend">
-                <div class="legend-item">
-                  <span class="legend-color" style="background:#00B8D9"></span>
-                  <div class="legend-text">
-                    <strong>Prescrit</strong>
-                    <span>{{ percentPrescrit }}% ({{ prescritCount }})</span>
-                  </div>
-                </div>
-                <div class="legend-item">
-                  <span class="legend-color" style="background:#20C997"></span>
-                  <div class="legend-text">
-                    <strong>Libre</strong>
-                    <span>{{ percentLibre }}% ({{ libreCount }})</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
         <div class="table-wrapper">
           <table class="history-table">
             <thead>
               <tr>
                 <th>Date</th>
-                <th>Aventure (Objectif)</th>
-                <th>Type</th>
+                <th>Scénario</th>
+                <th>Durée</th>
                 <th>Score</th>
-                <th>Revue Praticien</th>
-                <th></th>
+                <th>Statut</th>
+                <th>Détails</th>
               </tr>
             </thead>
             <tbody>
               <template v-for="(session, idx) in historyData" :key="idx">
                 <tr class="history-row-clickable" @click="toggleRow(idx)">
                   <td><strong>{{ session.date }}</strong></td>
-                  <td>{{ session.scenario }}<br><span style="font-size: 0.8rem; color: #94A3B8;">{{ session.duration }}</span></td>
-                  <td>
-                    <span v-if="session.type === 'prescrit'" class="tag-type prescrit">Prescrit</span>
-                    <span v-else class="tag-type libre">Libre</span>
-                  </td>
+                  <td>{{ session.scenario }}</td>
+                  <td>{{ session.duration }}</td>
                   <td><strong class="text-green">{{ session.score }} pts</strong></td>
-                  <td>
-                    <span v-if="session.reviewed" class="reviewed-status">
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#20C997" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg> Analysé
-                    </span>
-                    <span v-else class="pending-status">En attente</span>
-                  </td>
+                  <td><span class="tag-type prescrit">Validé</span></td>
                   <td style="text-align: right; color: #94A3B8;">
                     <svg :style="{ transform: expandedRow === idx ? 'rotate(180deg)' : 'rotate(0deg)', transition: '0.2s' }" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
                   </td>
                 </tr>
+                
                 <tr v-if="expandedRow === idx" class="history-details-row">
                   <td colspan="6">
                     <div class="history-details-box">
-                      <div class="details-grid">
-                        <div class="detail-item">
-                          <span class="detail-label">Vitesse moyenne</span>
-                          <span class="detail-value text-cyan">{{ session.avgSpeed }} km/h</span>
-                        </div>
-                        <div class="detail-item">
-                          <span class="detail-label">Fréq. cardiaque moy.</span>
-                          <span class="detail-value text-red">{{ session.avgBpm }} BPM</span>
-                        </div>
-                        <div class="detail-item">
-                          <span class="detail-label">Votre Ressenti</span>
-                          <div class="detail-value-stars">
-                            <span v-for="star in 5" :key="star" class="star-icon" :class="{ filled: star <= session.rating }">
-                              <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" stroke="none"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>
-                            </span>
-                            <span class="diff-badge" :class="'diff-' + session.difficulty.toLowerCase()">{{ session.difficulty }}</span>
-                          </div>
+                      
+                      <div class="h-chart-effort-container">
+                        <span class="chart-label-mini">VOTRE PROFIL D'EFFORT (Temps Réel)</span>
+                        <p class="chart-desc">Déplacement de l'avatar en fonction des obstacles franchis.</p>
+                        
+                        <div class="svg-wrapper">
+                          <svg viewBox="-20 -10 440 130" width="100%" height="100%" preserveAspectRatio="none">
+                            <line x1="0" y1="0" x2="0" y2="100" stroke="#CBD5E1" stroke-width="2"/>
+                            <line x1="0" y1="100" x2="400" y2="100" stroke="#CBD5E1" stroke-width="2"/>
+                            <line x1="0" y1="50" x2="400" y2="50" stroke="#E2E8F0" stroke-width="1" stroke-dasharray="4"/>
+                            
+                            <text x="-5" y="10" font-size="10" fill="#94A3B8" text-anchor="end" font-weight="bold">Max</text>
+                            <text x="-5" y="55" font-size="10" fill="#94A3B8" text-anchor="end">Moy</text>
+                            <text x="-5" y="100" font-size="10" fill="#94A3B8" text-anchor="end">Repos</text>
+                            
+                            <text x="0" y="115" font-size="10" fill="#94A3B8">0s</text>
+                            <text x="400" y="115" font-size="10" fill="#94A3B8" text-anchor="end">Fin</text>
+
+                            <polyline :points="session.svgPoints" fill="none" stroke="#20C997" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" />
+                          </svg>
                         </div>
                       </div>
-                      
-                      <div class="h-chart-effort" style="margin-top: 20px;">
-                        <span class="chart-label-mini">Votre profil d'effort (Cadence/Esquive)</span>
-                        <svg viewBox="0 0 100 30" class="mini-svg-chart" style="height: 60px;">
-                          <line x1="0" y1="25" x2="100" y2="25" stroke="#CBD5E1" stroke-dasharray="2" stroke-width="1"/>
-                          <polyline :points="session.svgPoints" fill="none" stroke="#00B8D9" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
-                        </svg>
+
+                      <div class="h-metrics-grid">
+                        <div class="metric-item">
+                          <span class="metric-label">Distance (d)</span>
+                          <span class="metric-value">{{ session.distance }} m</span>
+                        </div>
+                        <div class="metric-item">
+                          <span class="metric-label">Vit. Moy.</span>
+                          <span class="metric-value">{{ session.avgSpeed }} km/h</span>
+                        </div>
+                        <div class="metric-item">
+                          <span class="metric-label">Vit. Max</span>
+                          <span class="metric-value">{{ session.vitesseMax }} km/h</span>
+                        </div>
+                        
+                        <div class="metric-item">
+                          <span class="metric-label">Cadence Moy.</span>
+                          <span class="metric-value text-red">{{ session.rpm }} RPM</span>
+                        </div>
+                        <div class="metric-item">
+                          <span class="metric-label">Cadence Max</span>
+                          <span class="metric-value text-red">{{ session.maxRpm }} RPM</span>
+                        </div>
+                        <div class="metric-item">
+                          <span class="metric-label">Résistance Effort</span>
+                          <span class="metric-value">{{ session.resistanceEffort }}</span>
+                        </div>
+                        
+                        <div class="metric-item">
+                          <span class="metric-label">Puiss. Moyenne</span>
+                          <span class="metric-value text-cyan">{{ session.watts }} W</span>
+                        </div>
+                        <div class="metric-item">
+                          <span class="metric-label">Puiss. Explosive</span>
+                          <span class="metric-value text-cyan">{{ session.puissanceExplosive }} W</span>
+                        </div>
+                        <div class="metric-item">
+                          <span class="metric-label">Cardio (Moy/Max)</span>
+                          <span class="metric-value">{{ session.avgBpm }} / {{ session.maxBpm }}</span>
+                        </div>
                       </div>
 
                     </div>
@@ -440,21 +398,16 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
-import { useRouter, useRoute } from 'vue-router'
+import { ref, onMounted, computed, nextTick } from 'vue'
+import { useRouter } from 'vue-router'
 
 const router = useRouter()
-const route = useRoute()
-
-const activeTab = ref('programme')
+const activeTab = ref('historique')
+const expandedRow = ref(null)
 const showConfigStudio = ref(false)
 const selectedActivity = ref(null)
 const selectedEquip = ref('Vélo complet')
-const selectedAvatar = ref('avatar1') 
-
-const expandedRow = ref(null)
-const weekSchedule = ref([])
-const selectedDay = ref(0)
+const selectedAvatar = ref('avatar1')
 
 const goHome = () => router.push('/')
 
@@ -469,6 +422,8 @@ const avatars = [
 ]
 
 const userProfileImage = ref('/images/avBlonde.png') 
+const weekSchedule = ref([])
+const selectedDay = ref(0)
 
 onMounted(() => {
   const savedAvatar = localStorage.getItem('playnride_user_avatar')
@@ -522,54 +477,41 @@ const generateWeekSchedule = () => {
   selectedDay.value = schedule.findIndex(d => d.isToday) !== -1 ? schedule.findIndex(d => d.isToday) : 0
 }
 
-const historyData = ref([
-  { date: "Hier", type: "prescrit", scenario: "L'Aube Douce", duration: "15 min", score: 450, reviewed: true, avgSpeed: "18.5", avgBpm: 112, rating: 4, difficulty: "Facile", svgPoints: "0,25 10,20 20,10 30,25 40,20 50,5 60,25 70,25 80,10 90,25 100,20" },
-  { date: "12 Oct", type: "prescrit", scenario: "Souffle Océanique", duration: "10 min", score: 380, reviewed: true, avgSpeed: "16.2", avgBpm: 105, rating: 5, difficulty: "Facile", svgPoints: "0,25 20,25 40,10 60,25 80,25 100,25" },
-  { date: "10 Oct", type: "libre", scenario: "L'Échappée Sylvestre", duration: "20 min", score: 510, reviewed: false, avgSpeed: "21.0", avgBpm: 125, rating: 3, difficulty: "Moyen", svgPoints: "0,20 10,15 20,20 30,10 40,5 50,20 60,25 70,20 80,15 90,10 100,20" },
-  { date: "05 Oct", type: "prescrit", scenario: "Le Jardin des Sens", duration: "12 min", score: 230, reviewed: true, avgSpeed: "15.0", avgBpm: 100, rating: 4, difficulty: "Facile", svgPoints: "0,25 15,20 30,15 45,25 60,10 75,20 90,25 100,20" }
-])
 
-const totalTimePlayed = computed(() => historyData.value.reduce((acc, curr) => acc + parseInt(curr.duration), 0))
+// Les données historiques enrichies avec TOUTES les formules de ton cahier des charges
+const loadHistory = () => {
+  const savedData = localStorage.getItem('playnride_history');
+  if (savedData) return JSON.parse(savedData);
+  
+  // Données factices pour l'exemple
+  return [
+    { 
+      date: "Aujourd'hui", type: "prescrit", scenario: "L'Aube Douce", duration: "15 min", score: 450, reviewed: true, rating: 4, difficulty: "Facile",
+      distance: 1250, avgSpeed: "18.5", vitesseMax: "24.2", rpm: 85, maxRpm: 105, 
+      watts: 48, puissanceExplosive: 110, avgBpm: 112, maxBpm: 128, resistanceEffort: "82%",
+      svgPoints: "0,50 40,20 80,80 120,20 160,80 200,50 240,50 280,20 320,80 360,20 400,50" 
+    },
+    { 
+      date: "Hier", type: "prescrit", scenario: "L'Ascension Alpine", duration: "25 min", score: 850, reviewed: true, rating: 3, difficulty: "Moyen",
+      distance: 1800, avgSpeed: "21.0", vitesseMax: "28.5", rpm: 95, maxRpm: 115, 
+      watts: 55, puissanceExplosive: 130, avgBpm: 118, maxBpm: 132, resistanceEffort: "88%",
+      svgPoints: "0,50 20,80 40,20 60,80 80,80 100,20 120,80 140,80 160,80 180,20 200,50 220,80 240,20 260,80 280,80 300,80 320,20 340,50 360,80 380,80 400,80" 
+    },
+    { 
+      date: "12 Oct", type: "libre", scenario: "Souffle Océanique", duration: "10 min", score: 380, reviewed: false, rating: 5, difficulty: "Facile",
+      distance: 850, avgSpeed: "16.2", vitesseMax: "19.0", rpm: 75, maxRpm: 85, 
+      watts: 35, puissanceExplosive: 60, avgBpm: 95, maxBpm: 105, resistanceEffort: "95%",
+      svgPoints: "0,50 40,50 80,30 120,70 160,50 200,50" 
+    }
+  ];
+}
+
+const historyData = ref(loadHistory());
+const totalTimePlayed = computed(() => historyData.value.reduce((acc, curr) => acc + parseInt(curr.duration), 0));
 const averageScore = computed(() => {
   if (historyData.value.length === 0) return 0;
   const sum = historyData.value.reduce((acc, curr) => acc + curr.score, 0);
   return Math.round(sum / historyData.value.length);
-});
-
-const reversedHistory = computed(() => [...historyData.value].reverse().slice(0, 5)); 
-
-const prescritCount = computed(() => historyData.value.filter(s => s.type === 'prescrit').length)
-const libreCount = computed(() => historyData.value.filter(s => s.type === 'libre').length)
-
-const scoreBarPoints = computed(() => {
-  const data = reversedHistory.value;
-  if (data.length === 0) return [];
-  
-  const width = 480; 
-  const height = 150; 
-  const maxScore = 600;
-  const startX = 100; 
-  const startY = 20;
-  
-  return data.map((session, index) => {
-    let x = data.length === 1 ? startX + (width / 2) : startX + (index * (width / (data.length - 1)));
-    let scoreVal = parseInt(session.score) || 0;
-    if (scoreVal > maxScore) scoreVal = maxScore;
-    
-    let h = (scoreVal / maxScore) * height;
-    let y = startY + height - h;
-    
-    return { x, y, h, score: scoreVal, scenario: session.scenario, date: session.date === 'Hier' ? 'Hier' : session.date.split(' ')[0] };
-  });
-});
-
-const percentPrescrit = computed(() => {
-  if (historyData.value.length === 0) return 0;
-  return Math.round((prescritCount.value / historyData.value.length) * 100);
-});
-const percentLibre = computed(() => {
-  if (historyData.value.length === 0) return 0;
-  return 100 - percentPrescrit.value;
 });
 
 const toggleRow = (index) => {
@@ -577,9 +519,10 @@ const toggleRow = (index) => {
 }
 
 const unreadMessages = ref(1)
-const openMessagerie = () => { activeTab.value = 'messagerie'; unreadMessages.value = 0 }
+const openMessagerie = () => { activeTab.value = 'messagerie'; unreadMessages.value = 0; scrollToBottom() }
 
 const newMessage = ref('')
+const chatBodyRef = ref(null)
 const messages = ref([
   { sender: 'doctor', text: "Bonjour Jean, j'ai bien analysé vos résultats de la semaine dernière. La fréquence cardiaque est parfaite.", time: "Hier, 14:30" },
   { sender: 'patient', text: "Merci Docteur ! J'ai ressenti une petite raideur au genou droit sur la séance de vendredi par contre.", time: "Hier, 15:45" },
@@ -590,6 +533,15 @@ const sendMessage = () => {
   if (newMessage.value.trim() === '') return
   messages.value.push({ sender: 'patient', text: newMessage.value, time: "À l'instant" })
   newMessage.value = ''
+  scrollToBottom()
+}
+
+const scrollToBottom = () => {
+  nextTick(() => {
+    if (chatBodyRef.value) {
+      chatBodyRef.value.scrollTop = chatBodyRef.value.scrollHeight
+    }
+  })
 }
 
 const openConfigStudio = (activity) => {
@@ -608,12 +560,13 @@ const startGame = () => {
 
 <style scoped>
 .dashboard-layout { display: flex; height: 100vh; background-color: #FAFCFF; font-family: 'Nunito', sans-serif;}
-.sidebar { width: 280px; background: white; display: flex; flex-direction: column; justify-content: space-between; padding: 30px 20px; border-right: 1px solid #E2E8F0; z-index: 10;}
-.sidebar-brand { display: flex; align-items: center; gap: 12px; cursor: pointer; margin-bottom: 50px; }
+.sidebar { width: 280px; background: white; padding: 30px 20px; border-right: 1px solid #E2E8F0; display:flex; flex-direction:column; justify-content:space-between; z-index: 10;}
+.sidebar-brand { display: flex; align-items: center; gap: 12px; margin-bottom: 40px; cursor: pointer;}
 .sidebar-logo { height: 40px; }
-.logo-text { font-weight: 900; color: #0A192F; font-size: 1.2rem; }
-.sidebar-menu { display: flex; flex-direction: column; gap: 10px; }
-.menu-item { display: flex; align-items: center; justify-content: space-between; padding: 14px 18px; text-decoration: none; color: #6B7C93; font-weight: 700; border-radius: 12px; transition: all 0.2s ease; font-size: 1rem; position: relative;}
+.brand-name { font-weight: 900; font-size: 1.2rem; margin:0;}
+.brand-tag { font-size: 0.75rem; color: #00B8D9; font-weight: 800; text-transform: uppercase;}
+.sidebar-menu { display: flex; flex-direction: column; gap: 6px; }
+.menu-item { display: flex; align-items: center; gap: 12px; padding: 12px 16px; text-decoration: none; color: #6B7C93; font-weight: 700; border-radius: 12px; transition: all 0.2s ease; font-size: 1rem; position: relative;}
 .menu-icon { display: flex; align-items: center; justify-content: center; margin-right: 15px;}
 .menu-item > span:first-child { display: flex; align-items: center; }
 .menu-item:hover { background-color: #F8FAFC; color: #0A192F; }
@@ -622,15 +575,36 @@ const startGame = () => {
 .sidebar-bottom { border-top: 1px solid #E2E8F0; padding-top: 25px; }
 
 .user-mini-profile { display: flex; align-items: center; gap: 15px; margin-bottom: 25px; background: #F8FAFC; padding: 15px; border-radius: 12px;}
-.user-avatar-mini { width: 45px; height: 45px; border-radius: 50%; overflow: hidden; border: 2px solid white; box-shadow: 0 4px 6px rgba(0,0,0,0.05); background: white;}
-.user-avatar-mini img { width: 100%; height: 100%; object-fit: contain; padding: 2px;}
+
+/* CSS ROBUSTE POUR L'AVATAR (Empêche l'overflow massif) */
+.user-avatar-mini { 
+  width: 45px; 
+  height: 45px; 
+  min-width: 45px; 
+  min-height: 45px; 
+  border-radius: 50%; 
+  overflow: hidden; 
+  border: 2px solid white; 
+  box-shadow: 0 4px 6px rgba(0,0,0,0.05); 
+  background: white; 
+  display: block; 
+  position: relative;
+  flex-shrink: 0;
+}
+.user-avatar-mini img { 
+  width: 100%; 
+  height: 100%; 
+  object-fit: cover; 
+  display: block;
+}
+
 .user-name { font-size: 0.95rem; font-weight: 800; color: #0A192F; margin: 0 0 3px 0; line-height: 1.2;}
 .user-status { font-size: 0.8rem; color: #20C997; margin: 0; font-weight: 700;}
 
 .logout-btn-sidebar { background: none; border: none; color: #94A3B8; font-weight: 700; font-size: 1rem; cursor: pointer; display: flex; align-items: center; gap: 8px; transition: color 0.2s; width: 100%; justify-content: flex-start;}
 .logout-btn-sidebar:hover { color: #FC8181; }
 
-.main-content { flex: 1; padding: 40px 60px; overflow-y: auto; }
+.main-content { flex: 1; padding: 40px 60px; overflow-y: auto; position: relative;}
 .content-header { margin-bottom: 35px; } 
 .content-header h1 { font-size: 2.2rem; color: #0A192F; font-weight: 900; margin-bottom: 8px; letter-spacing: -0.5px;}
 .subtitle { color: #6B7C93; font-size: 1.1rem; }
@@ -698,36 +672,6 @@ const startGame = () => {
 .stat-info p { color: #6B7C93; font-size: 0.95rem; margin-bottom: 5px; font-weight: 700; text-transform: uppercase;}
 .stat-info h3 { color: #0A192F; font-size: 1.8rem; font-weight: 900; margin: 0;}
 
-/* VRAIS GRAPHIQUES SVG AVEC AXES */
-.charts-dashboard { display: flex; gap: 20px; margin-bottom: 30px; }
-.chart-card { background: white; border-radius: 16px; padding: 25px; border: 1px solid #E2E8F0; box-shadow: 0 4px 15px rgba(0,0,0,0.03); }
-.chart-large { flex: 2; }
-.chart-small { flex: 1; }
-.chart-title { color: #0A192F; font-size: 1rem; font-weight: 900; margin-bottom: 25px; text-transform: uppercase; letter-spacing: 0.5px;}
-
-.chart-container-axes { width: 100%; height: 240px; position: relative;}
-.svg-chart { width: 100%; height: 100%; overflow: visible;}
-
-.data-bar { cursor: pointer; transition: 0.2s; }
-.data-bar:hover { filter: brightness(1.1); }
-
-/* Donut SVG Chart */
-.donut-wrapper { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 20px;}
-.circular-chart { display: block; margin: 0 auto; max-width: 160px; max-height: 160px; }
-.circle-bg { fill: none; stroke: #F1F5F9; stroke-width: 3.8; }
-.circle { fill: none; stroke-width: 3.8; stroke-linecap: round; transition: stroke-dasharray 1s ease-out; }
-.libre-segment { stroke: #20C997; }
-.prescrit-segment { stroke: #00B8D9; }
-.donut-number { fill: #0A192F; font-size: 0.5rem; font-weight: 900; text-anchor: middle; font-family: 'Nunito', sans-serif;}
-.donut-label { fill: #6B7C93; font-size: 0.25rem; font-weight: 700; text-anchor: middle; font-family: 'Nunito', sans-serif;}
-
-.donut-legend { display: flex; flex-direction: column; gap: 12px; width: 100%; margin-top: 10px;}
-.legend-item { display: flex; align-items: center; gap: 10px;}
-.legend-color { width: 16px; height: 16px; border-radius: 4px; flex-shrink: 0;}
-.legend-text { display: flex; flex-direction: column; line-height: 1.2;}
-.legend-text strong { font-size: 0.9rem; color: #0A192F; }
-.legend-text span { font-size: 0.75rem; color: #6B7C93; font-weight: 600;}
-
 /* TABLEAU HISTORIQUE */
 .table-wrapper { background: white; border-radius: 16px; box-shadow: 0 4px 15px rgba(0,0,0,0.03); overflow: hidden; border: 1px solid #E2E8F0;}
 .history-table { width: 100%; border-collapse: collapse; }
@@ -736,31 +680,61 @@ const startGame = () => {
 .history-row-clickable { cursor: pointer; transition: background-color 0.2s; }
 .history-row-clickable:hover { background-color: #F8FAFC; }
 .history-details-row td { padding: 0; border-bottom: 2px solid #E2E8F0;}
-.history-details-box { background-color: #FAFCFF; padding: 25px 40px; border-left: 4px solid #00B8D9; box-shadow: inset 0 4px 6px -4px rgba(0,0,0,0.05);}
-.details-grid { display: flex; justify-content: space-between; gap: 20px; }
-.detail-item { flex: 1; display: flex; flex-direction: column; gap: 8px;}
-.detail-label { color: #6B7C93; font-size: 0.85rem; text-transform: uppercase; font-weight: 700; letter-spacing: 0.5px;}
-.detail-value { font-size: 1.2rem; font-weight: 900; }
-.detail-value-stars { display: flex; align-items: center; gap: 8px; }
-.star-icon { color: #E2E8F0; }
-.star-icon.filled { color: #FFB800; }
-.diff-badge { padding: 4px 10px; border-radius: 6px; font-size: 0.75rem; font-weight: 800; margin-left: 10px; }
-.diff-facile { background: #E8F8F5; color: #20C997; }
-.diff-moyen { background: #FFF9E6; color: #FFB800; }
-.diff-dur { background: #FFF5F5; color: #FC8181; }
+.text-green { color: #20C997; }
 .tag-type { padding: 4px 10px; border-radius: 6px; font-size: 0.75rem; font-weight: 800;}
 .tag-type.prescrit { background: #EAF7F9; color: #00B8D9;}
 .tag-type.libre { background: #F1F5F9; color: #6B7C93;}
-.text-green { color: #20C997; }
+
+/* --- DESIGN DE LA ZONE DÉROULANTE --- */
+.history-details-box { 
+  display: flex; 
+  gap: 30px; 
+  background-color: #FAFCFF; 
+  padding: 30px 40px; 
+  border-left: 4px solid #00B8D9; 
+  box-shadow: inset 0 4px 6px -4px rgba(0,0,0,0.05);
+  align-items: stretch;
+}
+
+@media (max-width: 1100px) {
+  .history-details-box { flex-direction: column; }
+}
+
+/* COURBE À GAUCHE */
+.h-chart-effort-container { 
+  flex: 1; 
+  min-width: 350px; 
+  background: white; 
+  padding: 20px; 
+  border-radius: 12px; 
+  border: 1px solid #E2E8F0; 
+  display: flex;
+  flex-direction: column;
+}
+.chart-label-mini { font-size: 0.8rem; font-weight: 800; color: #0A192F; text-transform: uppercase; margin-bottom: 5px; display: block;}
+.chart-desc { font-size: 0.75rem; color: #6B7C93; margin: 0 0 15px 0;}
+.svg-wrapper { flex: 1; min-height: 120px; display: block; overflow: visible;}
+
+/* GRILLE À DROITE (9 METRIQUES) */
+.h-metrics-grid { 
+  flex: 1.5; 
+  display: grid; 
+  grid-template-columns: repeat(3, 1fr); 
+  gap: 15px; 
+}
+.metric-item { 
+  background: white; 
+  border: 1px solid #E2E8F0; 
+  padding: 15px; 
+  border-radius: 12px; 
+  display: flex; 
+  flex-direction: column; 
+  justify-content: center;
+}
+.metric-label { color: #6B7C93; font-size: 0.7rem; text-transform: uppercase; font-weight: 800; margin-bottom: 6px; line-height: 1.1;}
+.metric-value { font-size: 1.2rem; font-weight: 900; color: #0A192F; }
 .text-cyan { color: #00B8D9; }
 .text-red { color: #FC8181; }
-.reviewed-status { display: inline-flex; align-items: center; gap: 6px; color: #047857; font-weight: 700; font-size: 0.85rem;}
-.pending-status { color: #94A3B8; font-style: italic; font-size: 0.85rem;}
-
-/* NOUVEAUX STYLES POUR LA COURBE SVG DANS LE DOSSIER PATIENT */
-.h-chart-effort { background: white; border-radius: 8px; padding: 15px; border: 1px solid #E2E8F0; }
-.chart-label-mini { font-size: 0.75rem; font-weight: 800; color: #0A192F; text-transform: uppercase; margin-bottom: 8px; display: block;}
-.mini-svg-chart { width: 100%; height: 60px; display: block;}
 
 /* TAB MESSAGERIE */
 .chat-container { background: white; border-radius: 16px; border: 1px solid #E2E8F0; display: flex; flex-direction: column; height: 600px; overflow: hidden; box-shadow: 0 4px 20px rgba(0,0,0,0.03);}
@@ -820,14 +794,12 @@ const startGame = () => {
 .btn-start-game { width: 100%; padding: 20px; border: none; border-radius: 16px; color: white; font-weight: 900; font-size: 1.1rem; cursor: pointer; transition: transform 0.2s, box-shadow 0.2s;}
 .btn-start-game:hover { transform: translateY(-3px); box-shadow: 0 15px 25px rgba(0,0,0,0.15); }
 
-/* UTILITAIRES ANIMATION */
 .tab-fade { animation: fadeIn 0.3s ease; }
 @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
 
 @media (max-width: 1024px) {
   .modal-inner { flex-direction: column; }
   .clinical-briefing { border-right: none; border-bottom: 1px solid #E2E8F0; padding: 30px; }
-  .prescription-card { flex-direction: column; }
-  .charts-dashboard { flex-direction: column; }
+  .history-details-box { flex-direction: column; }
 }
 </style>

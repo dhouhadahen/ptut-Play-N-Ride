@@ -121,7 +121,9 @@
               <tr v-for="patient in filteredPatients" :key="patient.id" class="patient-row" @click="openPatientDossier(patient)">
                 <td>
                   <div class="patient-cell-info">
-                    <img :src="patient.avatar" :alt="patient.nom" class="table-avatar" />
+                    <div class="table-avatar-wrapper">
+                      <img :src="patient.avatar" :alt="patient.nom" class="table-avatar" />
+                    </div>
                     <div>
                       <span class="font-bold">{{ patient.nom }}</span>
                       <span class="text-xs text-muted block">{{ patient.age }} ans</span>
@@ -156,7 +158,9 @@
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
           </button>
           <div class="panel-patient-head">
-            <img :src="selectedPatient.avatar" alt="Avatar" class="dossier-avatar" />
+            <div class="dossier-avatar-wrapper">
+              <img :src="selectedPatient.avatar" alt="Avatar" class="dossier-avatar" />
+            </div>
             <div>
               <h2>{{ selectedPatient.nom }}</h2>
               <p>{{ selectedPatient.age }} ans • {{ selectedPatient.pathologie }}</p>
@@ -186,28 +190,58 @@
           </div>
 
           <h3 class="section-title-small">Dernières Séances & Analyse</h3>
-          <div class="history-mini-list">
-            <div class="history-mini-item" v-for="(seance, i) in selectedPatient.historique" :key="i">
-              <div class="h-header-info">
-                <div class="h-date">{{ seance.date }}</div>
-                <div class="h-info">
-                  <strong>{{ seance.scenario }}</strong>
-                  <span>{{ seance.duree }} • FC Moy: {{ seance.fcMoy }} bpm • {{ seance.watts }} W</span>
-                </div>
-                <div class="h-rpe"><span :class="['diff-badge', 'diff-' + seance.rpe.toLowerCase()]">{{ seance.rpe }}</span></div>
-              </div>
+          <div class="history-list-pro">
+            <div class="history-item-pro" v-for="(seance, i) in selectedPatient.historique" :key="i">
               
-              <div class="h-chart-effort">
-                <span class="chart-label-mini">Profil d'effort</span>
-                <svg viewBox="0 0 100 30" class="mini-svg-chart">
-                  <line x1="0" y1="25" x2="100" y2="25" stroke="#CBD5E1" stroke-dasharray="2" stroke-width="1"/>
-                  <polyline :points="seance.svgPoints" fill="none" stroke="#00B8D9" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
-                </svg>
+              <div class="h-header-pro" @click="toggleProSession(i)" style="cursor: pointer;">
+                <div class="h-title-pro">
+                  <h4 style="margin: 0; color: #0A192F; font-size: 1.1rem; font-weight: 900;">Séance {{ selectedPatient.historique.length - i }}</h4>
+                  <span class="text-muted" style="font-size: 0.85rem;">{{ seance.date }} • {{ seance.scenario }} • {{ seance.duree }}</span>
+                </div>
+                <div style="display: flex; align-items: center; gap: 15px;">
+                  <span :class="['diff-badge', 'diff-' + seance.rpe.toLowerCase()]">EVA : {{ seance.rpe }}</span>
+                  <svg :style="{ transform: expandedProSession === i ? 'rotate(180deg)' : 'rotate(0deg)', transition: '0.2s' }" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#6B7C93" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
+                </div>
               </div>
+
+              <div v-if="expandedProSession === i" class="h-details-pro">
+                <div class="h-metrics-grid">
+                  <div class="metric-item"><span>Distance</span><strong>{{ seance.distance }} m</strong></div>
+                  <div class="metric-item"><span>Vit. Moyenne</span><strong>{{ seance.avgSpeed }} km/h</strong></div>
+                  <div class="metric-item"><span>Vit. Maximale</span><strong>{{ seance.vitesseMax }} km/h</strong></div>
+                  
+                  <div class="metric-item"><span>Cadence Moy.</span><strong>{{ seance.rpm }} RPM</strong></div>
+                  <div class="metric-item"><span>Cadence Max.</span><strong>{{ seance.maxRpm }} RPM</strong></div>
+                  <div class="metric-item"><span>Résistance Effort</span><strong>{{ seance.resistanceEffort }}</strong></div>
+                  
+                  <div class="metric-item"><span>Puissance Moy.</span><strong class="text-cyan">{{ seance.watts }} W</strong></div>
+                  <div class="metric-item"><span>Puissance Exp.</span><strong class="text-cyan">{{ seance.puissanceExplosive }} W</strong></div>
+                  <div class="metric-item"><span>Cardio (Moy/Max)</span><strong class="text-red">{{ seance.avgBpm }} / {{ seance.maxBpm }}</strong></div>
+                </div>
+                
+                <div class="h-chart-effort-pro" v-if="seance.svgPoints">
+                  <span class="chart-label-mini">Biofeedback : Profil d'effort (Position Avatar / Temps)</span>
+                  <svg viewBox="-20 -10 440 120" class="mini-svg-chart">
+                    <line x1="0" y1="0" x2="0" y2="100" stroke="#CBD5E1" stroke-width="2"/>
+                    <line x1="0" y1="100" x2="400" y2="100" stroke="#CBD5E1" stroke-width="2"/>
+                    <line x1="0" y1="50" x2="400" y2="50" stroke="#E2E8F0" stroke-dasharray="4" stroke-width="1"/>
+                    
+                    <text x="-5" y="10" font-size="10" fill="#94A3B8" text-anchor="end">Haut</text>
+                    <text x="-5" y="55" font-size="10" fill="#94A3B8" text-anchor="end">Moy</text>
+                    <text x="-5" y="100" font-size="10" fill="#94A3B8" text-anchor="end">Bas</text>
+                    
+                    <text x="0" y="115" font-size="10" fill="#94A3B8">0s</text>
+                    <text x="400" y="115" font-size="10" fill="#94A3B8" text-anchor="end">Fin de séance</text>
+
+                    <polyline :points="seance.svgPoints" fill="none" stroke="#00B8D9" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" />
+                  </svg>
+                </div>
+              </div>
+
             </div>
 
-            <div v-if="selectedPatient.historique.length === 0" class="text-muted text-xs text-center" style="padding:10px;">
-              Aucune séance enregistrée.
+            <div v-if="selectedPatient.historique.length === 0" class="text-muted text-center" style="padding:20px;">
+              Aucune séance enregistrée pour le moment.
             </div>
           </div>
           
@@ -429,6 +463,7 @@
           </div>
         </div>
       </div>
+
     </main>
 
     <div class="modal-overlay" :class="{ active: showAssignModal }" @click.self="showAssignModal = false">
@@ -521,7 +556,9 @@
         </div>
         <div class="modal-body-assign" v-if="selectedAgendaEvent">
           <div class="event-modal-head">
-            <img :src="selectedAgendaEvent.patient.avatar" alt="Avatar" class="event-modal-avatar"/>
+            <div class="event-modal-avatar-wrapper">
+              <img :src="selectedAgendaEvent.patient.avatar" alt="Avatar" class="event-modal-avatar"/>
+            </div>
             <div>
               <h4 style="margin:0; color:#0A192F;">{{ selectedAgendaEvent.patient.nom }}</h4>
               <p class="text-muted text-xs" style="margin:0;">Prévu à {{ selectedAgendaEvent.time }}</p>
@@ -554,7 +591,9 @@
 
 <script setup>
 import { ref, computed, onMounted, nextTick } from 'vue'
+import { useRouter } from 'vue-router'
 
+const router = useRouter()
 const activeTab = ref('patients')
 const showAssignModal = ref(false)
 const showPatientDossier = ref(false)
@@ -564,27 +603,50 @@ const selectedPatient = ref(null)
 const searchQuery = ref('')
 const isGeneratingPDF = ref(false)
 
+const expandedProSession = ref(0); // Ouvre la session la plus récente par défaut
+
+// Données fictives complétées avec les 9 métriques mathématiques demandées
 const patients = ref([
   { 
     id: 1, nom: "Jean Dupont", age: 72, pathologie: "Prothèse Genou Droit", observance: 85, lastRPE: "Difficile", derniereSeance: "Aujourd'hui", avatar: "/images/avBlonde.png",
     metrics: { fcMax: 130, puissanceMoyenne: 45, materiel: "Pédalier (Bras)" },
     historique: [
-      { date: "Aujourd'hui", scenario: "L'Aube Douce", duree: "20 min", fcMoy: 112, watts: 48, rpe: "Difficile", svgPoints: "0,25 10,20 20,10 30,25 40,20 50,5 60,25 70,25 80,10 90,25 100,20" },
-      { date: "Il y a 2 jours", scenario: "L'Échappée Sylvestre", duree: "15 min", fcMoy: 98, watts: 35, rpe: "Moyen", svgPoints: "0,20 10,15 20,20 30,10 40,5 50,20 60,25 70,20 80,15 90,10 100,20" }
+      { 
+        date: "Aujourd'hui", scenario: "L'Aube Douce", duree: "15 min", rpe: "Difficile",
+        distance: 1250, avgSpeed: "18.5", vitesseMax: "24.2", rpm: 85, maxRpm: 105, 
+        watts: 48, puissanceExplosive: 110, avgBpm: 112, maxBpm: 128, resistanceEffort: "82%",
+        svgPoints: "0,50 40,20 80,80 120,20 160,80 200,50 240,50 280,20 320,80 360,20 400,50" 
+      },
+      { 
+        date: "Hier", scenario: "L'Échappée Sylvestre", duree: "20 min", rpe: "Moyen",
+        distance: 1800, avgSpeed: "21.0", vitesseMax: "28.5", rpm: 95, maxRpm: 115, 
+        watts: 55, puissanceExplosive: 130, avgBpm: 118, maxBpm: 132, resistanceEffort: "88%",
+        svgPoints: "0,50 20,80 40,20 60,80 80,80 100,20 120,80 140,80 160,80 180,20 200,50 220,80 240,20 260,80 280,80 300,80 320,20 340,50 360,80 380,80 400,80" 
+      }
     ]
   },
   { 
     id: 2, nom: "Marie Martin", age: 68, pathologie: "Rééducation Cardiaque", observance: 95, lastRPE: "Facile", derniereSeance: "Hier", avatar: "/images/avatarRousse.png",
     metrics: { fcMax: 120, puissanceMoyenne: 30, materiel: "Vélo Complet" },
     historique: [
-      { date: "Hier", scenario: "Souffle Océanique", duree: "10 min", fcMoy: 95, watts: 25, rpe: "Facile", svgPoints: "0,25 20,25 40,10 60,25 80,25 100,25" }
+      { 
+        date: "Hier", scenario: "Souffle Océanique", duree: "10 min", rpe: "Facile",
+        distance: 850, avgSpeed: "16.2", vitesseMax: "19.0", rpm: 75, maxRpm: 85, 
+        watts: 35, puissanceExplosive: 60, avgBpm: 95, maxBpm: 105, resistanceEffort: "95%",
+        svgPoints: "0,50 40,50 80,30 120,70 160,50 200,50" 
+      }
     ]
   },
   { 
     id: 3, nom: "Pierre Durand", age: 80, pathologie: "Post-AVC", observance: 40, lastRPE: "Moyen", derniereSeance: "Il y a 7 jours", avatar: "/images/avBlackW.png",
     metrics: { fcMax: 115, puissanceMoyenne: 20, materiel: "Pédalier (Jambes)" },
     historique: [
-      { date: "12 Oct.", scenario: "Le Jardin des Sens", duree: "12 min", fcMoy: 88, watts: 18, rpe: "Moyen", svgPoints: "0,25 15,20 30,15 45,25 60,10 75,20 90,25 100,20" }
+      { 
+        date: "12 Oct.", scenario: "Le Jardin des Sens", duree: "12 min", rpe: "Moyen",
+        distance: 1100, avgSpeed: "15.0", vitesseMax: "20.1", rpm: 80, maxRpm: 92, 
+        watts: 40, puissanceExplosive: 85, avgBpm: 105, maxBpm: 115, resistanceEffort: "85%",
+        svgPoints: "0,25 15,20 30,15 45,25 60,10 75,20 90,25 100,20" 
+      }
     ]
   },
   { 
@@ -599,21 +661,25 @@ const patients = ref([
   }
 ])
 
-// --- TRI ALPHABÉTIQUE DES PATIENTS ---
 const filteredPatients = computed(() => {
   return patients.value
     .filter(p => p.nom.toLowerCase().includes(searchQuery.value.toLowerCase()))
     .sort((a, b) => a.nom.localeCompare(b.nom))
 })
 
-// --- NOMS D'ORIGINE ---
+const openPatientDossier = (patient) => {
+  selectedPatient.value = patient
+  expandedProSession.value = 0 // Reset accordion to show the latest session
+  showPatientDossier.value = true
+}
+
+const toggleProSession = (index) => {
+  expandedProSession.value = expandedProSession.value === index ? null : index;
+}
+
 const exercises = [
-  { id: 1, title: "L'Aube Douce", objective: "Échauffement", desc: "Pédalage léger pour réveiller les articulations.", duration: "15 min", intensity: "Faible", image: "/images/scen-matin.png", color: "#20C997" },
-  { id: 2, title: "L'Échappée Sylvestre", objective: "Coordination", desc: "Adaptation de la cadence aux variations du terrain en forêt.", duration: "20 min", intensity: "Modérée", image: "/images/scen-foret.png", color: "#00B8D9" },
-  { id: 3, title: "Souffle Océanique", objective: "Récupération", desc: "Pédalez le long de la côte à rythme régulier.", duration: "10 min", intensity: "Variable", image: "/images/scen-plage.png", color: "#0EA5E9" },
-  { id: 4, title: "Le Jardin des Sens", objective: "Cognitif", desc: "Parcourez ce jardin coloré. Votre attention sera doucement sollicitée.", duration: "12 min", intensity: "Faible", image: "/images/scen-jardin.png", color: "#38BDF8" },
-  { id: 5, title: "L'Ascension Alpine", objective: "Endurance", desc: "Défi stimulant en montagne pour faire travailler votre cœur.", duration: "25 min", intensity: "Élevée", image: "/images/scen-montagne.png", color: "#0284C7" },
-  { id: 6, title: "Voyage Aérien", objective: "Calme", desc: "Un parcours apaisant dans les nuages pour faire redescendre le cœur.", duration: "20 min", intensity: "Très Faible", image: "/images/scen-ciel.png", color: "#3B82F6" }
+  { id: 1, title: "L'Aube Douce", objective: "Échauffement", desc: "Pédalage léger.", image: "/images/scen-matin.png", color: "#20C997" },
+  { id: 5, title: "L'Ascension Alpine", objective: "Endurance", desc: "Défi en montagne.", image: "/images/scen-montagne.png", color: "#0284C7" },
 ]
 
 const selectedChatUserId = ref(patients.value[0].id)
@@ -691,11 +757,6 @@ const unreadLiveAlerts = ref(activeSessions.value.length)
 const openMonitoring = () => {
   activeTab.value = 'monitoring'
   unreadLiveAlerts.value = 0 
-}
-
-const openPatientDossier = (patient) => {
-  selectedPatient.value = patient
-  showPatientDossier.value = true
 }
 
 const generatePDF = (patient) => {
@@ -817,8 +878,11 @@ onMounted(() => {
 
 .sidebar-bottom { border-top: 1px solid #E2E8F0; padding-top: 20px; }
 .pro-profile { display: flex; align-items: center; gap: 12px; margin-bottom: 15px; background: #F8FAFC; padding: 12px; border-radius: 12px;}
-.pro-avatar { width: 40px; height: 40px; border-radius: 50%; overflow: hidden; border: 2px solid white; }
+
+/* CORRECTION AVATAR PRO */
+.pro-avatar { width: 45px; height: 45px; border-radius: 50%; overflow: hidden; border: 2px solid white; flex-shrink: 0; box-shadow: 0 4px 6px rgba(0,0,0,0.05); display: flex; align-items: center; justify-content: center; background: white;}
 .pro-avatar img { width: 100%; height: 100%; object-fit: cover;}
+
 .pro-name { font-size: 0.9rem; font-weight: 800; color: #0A192F; margin: 0 0 2px 0;}
 .pro-mail { font-size: 0.75rem; color: #6B7C93; margin: 0;}
 .logout-link { background: none; border: none; color: #6B7C93; font-weight: 700; font-size: 0.95rem; cursor: pointer; display: flex; align-items: center; gap: 8px; width: 100%; transition: 0.2s; padding: 5px 10px;}
@@ -880,24 +944,32 @@ onMounted(() => {
 .patient-row:hover { background: #F8FAFC; }
 .patient-row td { padding: 12px 20px; vertical-align: middle; font-size: 0.95rem;}
 .patient-cell-info { display: flex; align-items: center; gap: 12px; }
-.table-avatar { width: 40px; height: 40px; border-radius: 50%; object-fit: cover; border: 2px solid white; box-shadow: 0 2px 4px rgba(0,0,0,0.1); background: #F1F5F9;}
+
+/* CORRECTION AVATAR LISTE */
+.table-avatar-wrapper { width: 40px; height: 40px; border-radius: 50%; overflow: hidden; border: 2px solid white; box-shadow: 0 2px 4px rgba(0,0,0,0.1); background: #F1F5F9; display: flex; align-items: center; justify-content: center;}
+.table-avatar { width: 100%; height: 100%; object-fit: cover;}
+
 .observance-wrapper { display: flex; align-items: center; gap: 8px;}
 .status-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
 .date-info { font-weight: 600; color: #4A5568; }
 .diff-badge { padding: 4px 8px; border-radius: 6px; font-size: 0.75rem; font-weight: 800; }
 .diff-facile { background: #E8F8F5; color: #20C997; }
 .diff-moyen { background: #FFF9E6; color: #D97706; }
-.diff-difficile { background: #FFF5F5; color: #E53E3E; }
+.diff-dur { background: #FFF5F5; color: #E53E3E; }
 
-/* DOSSIER PATIENT PANEL */
-.patient-slide-panel { position: fixed; top: 0; right: -450px; width: 450px; height: 100vh; background: white; box-shadow: -5px 0 30px rgba(0,0,0,0.1); z-index: 100; transition: right 0.3s cubic-bezier(0.175, 0.885, 0.32, 1); display: flex; flex-direction: column;}
+/* --- DOSSIER PATIENT PANEL (ÉLARGI) --- */
+.patient-slide-panel { position: fixed; top: 0; right: -750px; width: 750px; height: 100vh; background: white; box-shadow: -5px 0 30px rgba(0,0,0,0.1); z-index: 100; transition: right 0.3s cubic-bezier(0.175, 0.885, 0.32, 1); display: flex; flex-direction: column;}
 .patient-slide-panel.panel-open { right: 0; }
 .panel-backdrop { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(10,25,47,0.3); z-index: 90; backdrop-filter: blur(2px);}
 .panel-header { padding: 30px 25px 20px; background: #F8FAFC; border-bottom: 1px solid #E2E8F0; position: relative;}
 .btn-close-panel { position: absolute; top: 15px; right: 15px; background: none; border: none; color: #6B7C93; cursor: pointer; transition: 0.2s;}
 .btn-close-panel:hover { color: #0A192F; }
 .panel-patient-head { display: flex; align-items: center; gap: 15px; margin-bottom: 15px;}
-.dossier-avatar { width: 60px; height: 60px; border-radius: 50%; object-fit: cover; border: 3px solid white; box-shadow: 0 4px 10px rgba(0,0,0,0.05); background:#fff;}
+
+/* CORRECTION AVATAR DOSSIER */
+.dossier-avatar-wrapper { width: 60px; height: 60px; border-radius: 50%; overflow: hidden; border: 3px solid white; box-shadow: 0 4px 10px rgba(0,0,0,0.05); background:#fff; display: flex; align-items: center; justify-content: center; flex-shrink: 0;}
+.dossier-avatar { width: 100%; height: 100%; object-fit: cover; }
+
 .panel-patient-head h2 { margin: 0; color: #0A192F; font-size: 1.4rem; font-weight: 900;}
 .panel-patient-head p { margin: 0; color: #6B7C93; font-size: 0.9rem; font-weight: 600;}
 .panel-actions { display: flex; gap: 10px; }
@@ -910,21 +982,32 @@ onMounted(() => {
 .health-list li { margin-bottom: 8px; padding-bottom: 8px; border-bottom: 1px solid #F1F5F9;}
 .health-list li:last-child { border-bottom: none; margin-bottom: 0; padding-bottom: 0;}
 .observance-big { font-size: 2.2rem; font-weight: 900; color: #20C997; text-align: center; line-height: 1; margin-bottom: 5px;}
-.section-title-small { font-size: 0.95rem; color: #0A192F; font-weight: 800; margin-bottom: 15px; border-bottom: 2px solid #F1F5F9; padding-bottom: 8px;}
+.section-title-small { font-size: 1.1rem; color: #0A192F; font-weight: 900; margin-bottom: 20px; border-bottom: 2px solid #F1F5F9; padding-bottom: 10px;}
 
-/* NOUVEAUX STYLES POUR LA COURBE SVG DANS LE DOSSIER KINE */
-.history-mini-list { display: flex; flex-direction: column; gap: 15px;}
-.history-mini-item { display: flex; flex-direction: column; gap: 10px; background: white; padding: 15px; border-radius: 12px; border: 1px solid #E2E8F0; box-shadow: 0 2px 5px rgba(0,0,0,0.02);}
-.h-header-info { display: flex; align-items: flex-start; justify-content: space-between; }
-.h-date { font-size: 0.75rem; font-weight: 800; color: #6B7C93; width: 60px;}
-.h-info { flex: 1; display: flex; flex-direction: column; padding-right: 10px;}
-.h-info strong { font-size: 0.9rem; color: #0A192F; margin-bottom: 2px;}
-.h-info span { font-size: 0.75rem; color: #94A3B8;}
-.h-chart-effort { background: #FAFCFF; border-radius: 8px; padding: 10px; border: 1px solid #F1F5F9; }
-.chart-label-mini { font-size: 0.7rem; font-weight: 800; color: #0A192F; text-transform: uppercase; margin-bottom: 5px; display: block;}
-.mini-svg-chart { width: 100%; height: 30px; display: block;}
+/* HISTORIQUE ACCORDÉON (PRO) */
+.history-list-pro { display: flex; flex-direction: column; gap: 20px;}
+.history-item-pro { display: flex; flex-direction: column; background: #FAFCFF; border-radius: 16px; border: 1px solid #E2E8F0; box-shadow: 0 2px 10px rgba(0,0,0,0.02); overflow: hidden;}
+.h-header-pro { display: flex; justify-content: space-between; align-items: center; padding: 15px 20px; background: white;}
+.h-header-pro:hover { background: #F8FAFC; }
+.h-title-pro h4 { margin: 0 0 5px 0; color: #0A192F; font-size: 1.1rem;}
+.h-details-pro { padding: 20px; border-top: 1px solid #E2E8F0; background: #FAFCFF; animation: fadeIn 0.3s ease;}
 
-/* ONGLET 2 : AGENDA CALENDRIER */
+/* Grille de 9 métriques */
+.h-metrics-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 20px;}
+.metric-item { background: white; border: 1px solid #E2E8F0; padding: 15px; border-radius: 10px; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center;}
+.metric-item span { font-size: 0.7rem; color: #6B7C93; text-transform: uppercase; font-weight: 800; margin-bottom: 5px; line-height: 1.1;}
+.metric-item strong { font-size: 1.1rem; font-weight: 900; color: #0A192F; }
+
+/* COURBE SVG D'EFFORT (PRO) */
+.h-chart-effort-pro { background: white; border-radius: 12px; padding: 20px; border: 1px solid #E2E8F0; }
+.chart-label-mini { font-size: 0.85rem; font-weight: 800; color: #0A192F; text-transform: uppercase; margin-bottom: 15px; display: block;}
+.mini-svg-chart { width: 100%; height: 120px; display: block; overflow: visible;}
+
+/* RESTE DU CSS CONSERVÉ */
+.tab-fade { animation: fadeIn 0.3s ease; }
+@keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+/* AGENDA, BIBLIOTHEQUE, MESSAGERIE, ETC. */
 .calendar-controls { display: flex; align-items: center; gap: 15px;}
 .current-month { margin: 0; font-size: 1.2rem; color: #0A192F; font-weight: 900; width: 180px; text-align: center;}
 .calendar-container { background: white; border-radius: 16px; border: 1px solid #E2E8F0; overflow: hidden; display: flex; flex-direction: column; flex: 1; min-height: 500px;}
@@ -945,7 +1028,6 @@ onMounted(() => {
 .e-name { font-weight: 700; color: #0A192F; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 60px;}
 .e-time { font-size: 0.65rem; color: #4A5568;}
 
-/* ONGLET 3 : BIBLIOTHEQUE PRESCRIPTION */
 .grid-layout { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 25px; }
 .prescription-card { background: white; border-radius: 16px; overflow: hidden; box-shadow: 0 2px 15px rgba(0,0,0,0.03); border: 1px solid #E2E8F0; display: flex; flex-direction: column;}
 .presc-img-wrapper { height: 140px; width: 100%; display: flex; justify-content: center; align-items: center;}
@@ -956,7 +1038,6 @@ onMounted(() => {
 .presc-content p { font-size: 0.9rem; line-height: 1.5; margin-bottom: 15px; flex: 1;}
 .presc-metrics { display: flex; gap: 15px; margin-bottom: 15px; font-size: 0.8rem; font-weight: 700; color: #4A5568;}
 
-/* ONGLET 4 : MONITORING LIVE (SANS CONTROLE MOTEUR) */
 .empty-state { background: white; padding: 50px; border-radius: 16px; text-align: center; border: 1px dashed #CBD5E1; color: #6B7C93;}
 .empty-state h4 { color: #0A192F; font-size: 1.2rem; margin: 15px 0 5px; font-weight: 800;}
 .monitoring-panel { max-width: 900px; }
@@ -973,7 +1054,6 @@ onMounted(() => {
 .metric strong { font-size: 2rem; font-weight: 900; line-height: 1;}
 .metric-chart { font-family: monospace; letter-spacing: -1px; color: #00B8D9; margin-top: 10px; font-weight: bold; overflow: hidden; white-space: nowrap;}
 
-/* ONGLET 5 : PARAMETRES */
 .settings-card { background: white; border-radius: 16px; padding: 35px; box-shadow: 0 2px 15px rgba(0,0,0,0.03); border: 1px solid #E2E8F0; max-width: 700px;}
 .settings-card h3 { color: #0A192F; font-size: 1.1rem; font-weight: 900; margin-bottom: 20px; border-bottom: 2px solid #F1F5F9; padding-bottom: 10px;}
 .form-group { display: flex; flex-direction: column; gap: 6px; margin-bottom: 18px; }
@@ -988,7 +1068,6 @@ onMounted(() => {
 input:checked + .slider-toggle { background-color: #20C997; }
 input:checked + .slider-toggle:before { transform: translateX(20px); }
 
-/* ONGLET 6 : MESSAGERIE DYNAMIQUE */
 .messages-layout { display: flex; height: 600px; background: white; border-radius: 16px; overflow: hidden; border: 1px solid #E2E8F0; box-shadow: 0 4px 20px rgba(0,0,0,0.03);}
 .messages-list { width: 320px; border-right: 1px solid #E2E8F0; background: #F8FAFC; overflow-y: auto;}
 .msg-contact { display: flex; align-items: center; gap: 12px; padding: 15px 20px; border-bottom: 1px solid #E2E8F0; cursor: pointer; transition: 0.2s;}
@@ -1015,7 +1094,6 @@ input:checked + .slider-toggle:before { transform: translateX(20px); }
 .btn-send-pro { background: #00B8D9; border: none; width: 48px; height: 48px; border-radius: 10px; display: flex; justify-content: center; align-items: center; color: white; cursor: pointer; transition: 0.2s;}
 .btn-send-pro:hover { background: #0284C7; transform: scale(1.05);}
 
-/* MODAL ASSIGNATION & AGENDA DETAIL */
 .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(10,25,47,0.8); z-index: 1000; display: flex; justify-content: center; align-items: center; opacity: 0; visibility: hidden; transition: 0.3s; padding: 20px; backdrop-filter: blur(3px);}
 .modal-overlay.active { opacity: 1; visibility: visible; }
 .assign-modal { background: white; width: 100%; max-width: 500px; border-radius: 20px; overflow: hidden; transform: translateY(30px); transition: 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275); box-shadow: 0 25px 50px rgba(0,0,0,0.2);}
@@ -1030,15 +1108,11 @@ input:checked + .slider-toggle:before { transform: translateX(20px); }
 .presc-summary strong { color: #0A192F; font-size: 1rem; display: block; margin-bottom: 4px;}
 .form-row { display: flex; gap: 15px; }
 
-/* STYLES SPECIFIQUES MODAL AGENDA */
 .event-modal-head { display: flex; align-items: center; gap: 15px; margin-bottom: 20px; padding-bottom: 20px; border-bottom: 1px solid #F1F5F9;}
-.event-modal-avatar { width: 50px; height: 50px; border-radius: 50%; object-fit: cover; border: 2px solid #E2E8F0;}
+.event-modal-avatar-wrapper { width: 50px; height: 50px; border-radius: 50%; overflow: hidden; border: 2px solid #E2E8F0; display: flex; align-items: center; justify-content: center; background: white;}
+.event-modal-avatar { width: 100%; height: 100%; object-fit: cover;}
 .event-modal-body { display: flex; flex-direction: column; gap: 15px;}
 .e-data { display: flex; justify-content: space-between; align-items: center; background: #F8FAFC; padding: 12px; border-radius: 8px;}
 .e-data span { font-size: 0.85rem; color: #6B7C93; font-weight: 700; text-transform: uppercase;}
 .e-data strong { font-size: 0.95rem; color: #0A192F;}
-
-/* ANIMATION */
-.tab-fade { animation: fadeIn 0.3s ease; }
-@keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
 </style>
