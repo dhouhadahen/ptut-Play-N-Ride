@@ -14,7 +14,7 @@
         <canvas id="game" width="300" height="500"></canvas>
         <p id="description" class="game-description">Pédalez fort pour commencer !</p>
         <div v-if="hasWon" class="victory-banner">🎉 SÉANCE TERMINÉE ! 🎉</div>
-        <div v-if="isGameOver && !hasWon" class="victory-banner" style="background: #E53E3E;">❌ ÉCHEC DU PARCOURS ❌</div>
+        <div v-if="isGameOver && !hasWon" class="victory-banner" style="background: #F59E0B;">💪 BEL EFFORT ! 💪</div>
       </div>
 
       <div class="live-players-sidebar" :class="{ 'is-open': showLivePlayers }">
@@ -39,10 +39,10 @@
       <div class="end-modal-wide">
         
         <div class="modal-header-end">
-          <span class="trophy-icon" v-if="hasWon">🏆</span>
-          <span class="trophy-icon" v-else>💔</span>
-          <h3>{{ hasWon ? 'Session Terminée !' : 'Séance Échouée' }}</h3>
+          <span class="trophy-icon">🏆</span>
+          <h3>Session Terminée</h3>
           <p class="bravo-text" v-if="hasWon">Objectif clinique atteint ! 🎉</p>
+          <p class="bravo-text" style="color: #F59E0B;" v-else>Bel effort ! N'hésitez pas à réessayer pour aller jusqu'au bout. 💪</p>
         </div>
         
         <div class="modal-body-split">
@@ -75,7 +75,7 @@
 
           <div class="modal-right">
             
-            <div class="podium-container" v-if="hasWon">
+            <div class="podium-container">
               <div class="podium-place place-2" v-if="sortedLeaderboard[1]">
                 <div class="medal">🥈</div>
                 <div class="podium-bar silver">
@@ -142,9 +142,14 @@
               </div>
             </div>
 
-            <button class="btn-save-score" @click="saveAndReturn" :disabled="saving">
-              {{ saving ? 'Enregistrement...' : 'ENREGISTRER AU DOSSIER' }}
-            </button>
+            <div style="display: flex; flex-direction: column; gap: 10px; width: 100%; margin-top: auto;">
+              <button v-if="!hasWon" class="btn-retry-score" @click="retrySession">
+                RÉESSAYER
+              </button>
+              <button class="btn-save-score" @click="saveAndReturn" :disabled="saving">
+                {{ saving ? 'Enregistrement...' : 'ENREGISTRER AU DOSSIER' }}
+              </button>
+            </div>
 
           </div>
         </div>
@@ -199,6 +204,9 @@ let totalFlaps = 0;
 let flapsThisSecond = 0; 
 let lastSecondCheck = 0;
 
+// Ce "pont" permettra d'appeler le reset du jeu (dans le onMounted) depuis le bouton de la modale (hors du onMounted)
+let forceGameReset = null;
+
 // --- MAPPING DU SCENARIO ---
 let themeURL = route.query.theme ? decodeURIComponent(route.query.theme) : "L'Aube Douce";
 let themeStr = String(themeURL).toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
@@ -239,6 +247,14 @@ const effortPolyline = computed(() => {
     return `${x},${y}`;
   }).join(' ');
 })
+
+// Fonction pour fermer la modale et REINITIALISER VRAIMENT le jeu
+const retrySession = () => {
+  showEndScreen.value = false;
+  if (forceGameReset) {
+    forceGameReset(); // On déclenche la fonction de réinitialisation qui se trouve dans onMounted
+  }
+}
 
 onMounted(() => {
   let cvs = document.getElementById('game')
@@ -379,13 +395,14 @@ onMounted(() => {
         
         if(p.x + this.w < bird.x && !p.passed) { 
           score.current++; p.passed = true; SFX_SCORE.play().catch(()=>{});
+          // Simulation d'une pointe de puissance (explosive) lors d'un passage
           let puissanceInstantanee = 27 * ((jsonSpeed * 3.6) / 3.6); 
-          if(p.h === 240) puissanceInstantanee *= 1.5; 
+          if(typeObs === 'x2' || typeObs === 'y2') puissanceInstantanee *= 1.5; 
           if(puissanceInstantanee > puissanceExplosive.value) puissanceExplosive.value = puissanceInstantanee;
         }; 
         if(p.x + this.w < 0) { this.pipeArray.shift(); i--; continue; }
         
-        // COLLISION = GAME OVER
+        // COLLISION = GAME OVER IMMEDIAT (L'Avatar tombe)
         if (!hasWon.value && bBox.left < pBox.right && bBox.right > pBox.left && bBox.top < pBox.bottom && bBox.bottom > pBox.top) { 
           SFX_COLLISION.play().catch(()=>{});
           gameState.current = gameState.gameOver; 
@@ -413,7 +430,13 @@ onMounted(() => {
               else { this.velocity += this.gravity; this.y += this.velocity; }
               
               if (this.velocity <= this.fly) { this.rotation = -15 * degree } else if (this.velocity >= this.fly+2) { this.rotation = 70 * degree; } else { this.rotation = 0 }
-              if (this.y+this.h/2 >= cvs.height-ground.h) { this.y = cvs.height-ground.h - this.h/2; if (gameState.current == gameState.play) { gameState.current = gameState.gameOver; SFX_FALL.play().catch(()=>{}) } }
+              // COLLISION SOL = GAME OVER IMMEDIAT
+              if (this.y+this.h/2 >= cvs.height-ground.h) { 
+                this.y = cvs.height-ground.h - this.h/2; 
+                if (gameState.current == gameState.play) { 
+                  gameState.current = gameState.gameOver; SFX_FALL.play().catch(()=>{}) 
+                } 
+              }
               if (this.y-this.h/2 <= 0) { this.y = this.r }
           }
       }
@@ -427,6 +450,23 @@ onMounted(() => {
   }
 
   let update = () => { bird.position(); bg.position(); ground.position() }
+
+  // LA FONCTION DE REINITIALISATION DU MOTEUR (Appelée par le canvas ou le bouton)
+  const resetGameEngine = () => {
+      pipes.reset(); 
+      score.reset(); 
+      effortData.value = []; 
+      cadencesArray.value = []; 
+      SFX_SWOOSH.play().catch(()=>{}); 
+      gameState.current = gameState.getReady; 
+      description.style.visibility = "visible";
+      sessionStartTime = null; 
+      sessionEndTime = null; 
+      timeRemainingText.value = `${activeConfig.dureeMinutes}:00`; 
+  }
+
+  // On lie cette fonction à la variable globale pour le bouton "RÉESSAYER"
+  forceGameReset = resetGameEngine;
 
   let loop = () => {
       let isTimeUp = false;
@@ -508,10 +548,19 @@ onMounted(() => {
 
   handleInput = (e) => {
       if (e.type === 'keydown' && e.keyCode !== 32) return;
-      if (showEndScreen.value) return; 
-      if (gameState.current == gameState.getReady) { gameState.current = gameState.play; description.style.visibility = "hidden"; }
-      if (gameState.current == gameState.play && !hasWon.value) { bird.flap(); SFX_FLAP.play().catch(()=>{}); }
-      if (gameState.current == gameState.gameOver && !hasWon.value) { pipes.reset(); score.reset(); effortData.value = []; cadencesArray.value = []; SFX_SWOOSH.play().catch(()=>{}); gameState.current = gameState.getReady; description.innerHTML = "Pédalez fort pour commencer !"; sessionStartTime = null; sessionEndTime = null; timeRemainingText.value = `${activeConfig.dureeMinutes}:00`; }
+      if (showEndScreen.value) return; // Si la modale est ouverte, on ignore la barre espace
+      
+      if (gameState.current == gameState.getReady) { 
+          gameState.current = gameState.play; 
+          description.style.visibility = "hidden"; 
+      }
+      if (gameState.current == gameState.play && !hasWon.value) { 
+          bird.flap(); 
+          SFX_FLAP.play().catch(()=>{}); 
+      }
+      if (gameState.current == gameState.gameOver && !hasWon.value) { 
+          resetGameEngine(); // On utilise la même fonction de reset quand on clique sur le canvas en mode échec
+      }
   }
 
   cvs.addEventListener('click', handleInput)
@@ -527,9 +576,11 @@ const saveAndReturn = () => {
   saving.value = true
   const returnPath = route.query.from === 'guest' ? '/guest-dashboard' : '/patient-dashboard'
 
+  // --- PASSAGE DES DONNEES AU DASHBOARD PATIENT ---
   const pointsSVG = effortPolyline.value;
   const history = JSON.parse(localStorage.getItem('playnride_history')) || [];
   
+  // On insère TOUTES les données mathématiques calculées
   history.unshift({
     date: new Date().toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' }),
     type: "libre", 
@@ -663,8 +714,11 @@ canvas { display: block; width: 100%; height: auto; image-rendering: pixelated; 
 .difficulty-buttons button { padding: 10px 15px; border: 2px solid #E2E8F0; background: white; border-radius: 20px; cursor: pointer; font-weight: 700; color: #6B7C93; transition: 0.2s; font-size: 0.85rem; flex: 1;}
 .difficulty-buttons button.active { border-color: #FFB800; background: #FFF9E6; color: #FFB800; }
 
-/* BOUTON ENREGISTRER */
-.btn-save-score { width: 100%; padding: 16px; border: none; border-radius: 50px; background-color: #00B8D9; color: white; font-size: 1rem; font-weight: 900; cursor: pointer; transition: 0.2s; margin-top: auto;}
+/* BOUTON ENREGISTRER / REESSAYER */
+.btn-retry-score { width: 100%; padding: 16px; border: 2px solid #00B8D9; border-radius: 50px; background-color: transparent; color: #00B8D9; font-size: 1rem; font-weight: 900; cursor: pointer; transition: 0.2s; }
+.btn-retry-score:hover { background-color: #EAF7F9; }
+
+.btn-save-score { width: 100%; padding: 16px; border: none; border-radius: 50px; background-color: #00B8D9; color: white; font-size: 1rem; font-weight: 900; cursor: pointer; transition: 0.2s;}
 .btn-save-score:hover:not(:disabled) { background-color: #0284C7; transform: translateY(-2px);}
 .btn-save-score:disabled { opacity: 0.7; cursor: not-allowed; }
 </style>
